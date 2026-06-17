@@ -5,526 +5,200 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>股市熱力圖 · StockMap</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
-
-  :root {
-    --bg: #0a0d12;
-    --surface: #111520;
-    --border: #1e2535;
-    --text: #e2e8f0;
-    --muted: #64748b;
-    --gain5: #00c853;
-    --gain3: #43a047;
-    --gain1: #2e7d32;
-    --flat: #263238;
-    --loss1: #b71c1c;
-    --loss3: #c62828;
-    --loss5: #e53935;
-    --accent: #3b82f6;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* ── Header ── */
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 24px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
-  .logo {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .logo-dot {
-    width: 8px; height: 8px;
-    background: var(--gain5);
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.8); }
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  #refresh-info {
-    font-size: 12px;
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  #last-updated {
-    font-size: 12px;
-    color: var(--muted);
-  }
-
-  .refresh-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-family: 'Inter', sans-serif;
-    transition: border-color 0.2s, background 0.2s;
-  }
-
-  .refresh-btn:hover { border-color: var(--accent); background: rgba(59,130,246,0.08); }
-
-  /* ── Tabs ── */
-  .tabs {
-    display: flex;
-    gap: 4px;
-    padding: 16px 24px 0;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-  }
-
-  .tab {
-    padding: 8px 20px;
-    border-radius: 8px 8px 0 0;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--muted);
-    border: 1px solid transparent;
-    border-bottom: none;
-    transition: color 0.2s, background 0.2s;
-    background: transparent;
-  }
-
-  .tab:hover { color: var(--text); }
-
-  .tab.active {
-    background: var(--surface);
-    border-color: var(--border);
-    color: var(--text);
-    position: relative;
-    bottom: -1px;
-  }
-
-  /* ── Legend ── */
-  .legend {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 12px 24px;
-    font-size: 11px;
-    color: var(--muted);
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .legend-bar {
-    display: flex;
-    border-radius: 4px;
-    overflow: hidden;
-    height: 12px;
-  }
-
-  .legend-bar span {
-    width: 36px;
-    display: inline-block;
-  }
-
-  .legend-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-
-  /* ── Main ── */
-  main { flex: 1; padding: 20px 24px; }
-
-  .section-title {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .section-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  /* ── Heatmap Grid ── */
-  .heatmap-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    margin-bottom: 28px;
-    min-height: 80px;
-  }
-
-  .stock-tile {
-    border-radius: 6px;
-    padding: 8px 10px;
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    position: relative;
-    overflow: hidden;
-    min-width: 70px;
-    min-height: 70px;
-  }
-
-  .stock-tile::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(255,255,255,0.03);
-    pointer-events: none;
-  }
-
-  .stock-tile:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-    filter: brightness(1.15);
-    z-index: 10;
-  }
-
-  .tile-symbol {
-    font-size: 11px;
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-    color: rgba(255,255,255,0.95);
-    letter-spacing: 0.3px;
-  }
-
-  .tile-name {
-    font-size: 9px;
-    color: rgba(255,255,255,0.6);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 2px;
-  }
-
-  .tile-change {
-    font-size: 14px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.95);
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  .tile-price {
-    font-size: 9px;
-    color: rgba(255,255,255,0.6);
-    font-family: 'JetBrains Mono', monospace;
-    margin-top: 1px;
-  }
-
-  /* ── Tooltip ── */
-  #tooltip {
-    position: fixed;
-    background: #1a2035;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 16px;
-    font-size: 13px;
-    pointer-events: none;
-    z-index: 999;
-    opacity: 0;
-    transition: opacity 0.15s;
-    min-width: 200px;
-    box-shadow: 0 16px 40px rgba(0,0,0,0.5);
-  }
-
-  #tooltip.visible { opacity: 1; }
-
-  .tt-symbol {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    font-size: 15px;
-    margin-bottom: 4px;
-  }
-
-  .tt-name { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
-
-  .tt-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    margin-bottom: 4px;
-  }
-
-  .tt-label { color: var(--muted); }
-
-  .tt-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-  }
-
-  .tt-val.pos { color: var(--gain5); }
-  .tt-val.neg { color: var(--loss5); }
-
-  /* ── Loading / Error ── */
-  .loading-overlay {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 40px;
-    color: var(--muted);
-    font-size: 13px;
-    width: 100%;
-  }
-
-  .spinner {
-    width: 18px; height: 18px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Stats Bar ── */
-  .stats-bar {
-    display: flex;
-    gap: 24px;
-    padding: 12px 24px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    font-size: 12px;
-  }
-
-  .stat-item { display: flex; gap: 6px; align-items: center; }
-  .stat-label { color: var(--muted); }
-  .stat-val { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
-  .stat-val.pos { color: var(--gain5); }
-  .stat-val.neg { color: var(--loss5); }
-
-  /* ── ETF special badge ── */
-  .etf-badge {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    font-size: 7px;
-    font-weight: 700;
-    background: rgba(255,255,255,0.15);
-    border-radius: 3px;
-    padding: 1px 4px;
-    letter-spacing: 0.5px;
-  }
-
-  /* ── Macro Grid ── */
-  .macro-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 10px;
-    margin-bottom: 28px;
-  }
-
-  .macro-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    transition: border-color 0.2s;
-  }
-
-  .macro-card:hover { border-color: var(--accent); }
-
-  .macro-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .macro-value {
-    font-size: 20px;
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--text);
-  }
-
-  .macro-change {
-    font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-  }
-
-  .macro-change.pos { color: var(--gain5); }
-  .macro-change.neg { color: var(--loss5); }
-  .macro-change.neu { color: var(--muted); }
-
-  .macro-desc {
-    font-size: 10px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-
-  /* ── News List ── */
-  .news-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .news-item {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 16px;
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-    text-decoration: none;
-    color: var(--text);
-    transition: border-color 0.2s, background 0.2s;
-    cursor: pointer;
-  }
-
-  .news-item:hover {
-    border-color: var(--accent);
-    background: rgba(59,130,246,0.05);
-  }
-
-  .news-source-badge {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 4px;
-    white-space: nowrap;
-    flex-shrink: 0;
-    margin-top: 2px;
-  }
-
-  .badge-reuters { background: #e85d04; color: #fff; }
-  .badge-yahoo   { background: #6001d2; color: #fff; }
-  .badge-ft      { background: #fff; color: #000; }
-  .badge-cnbc    { background: #0057a8; color: #fff; }
-  .badge-fed     { background: #1a3a5c; color: #7eb8e8; border: 1px solid #2a5a8c; }
-  .badge-mw      { background: #000; color: #fff; }
-  .badge-investing { background: #e84040; color: #fff; }
-
-  .news-left {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    align-items: flex-start;
-    flex-shrink: 0;
-  }
-
-  .news-desc {
-    font-size: 11px;
-    color: var(--muted);
-    line-height: 1.5;
-    margin: 3px 0;
-  }
-
-  .news-breaking {
-    border-color: rgba(239,68,68,0.4) !important;
-    background: rgba(239,68,68,0.04) !important;
-  }
-
-  .news-breaking:hover {
-    border-color: rgba(239,68,68,0.7) !important;
-    background: rgba(239,68,68,0.08) !important;
-  }
-
-  .news-section-label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin: 8px 0 10px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .news-section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  /* Impact badges upgrade */
-  .impact-urgent   { background: rgba(239,68,68,0.25);  color: #f87171; }
-  .impact-fed      { background: rgba(59,130,246,0.2);  color: #60a5fa; }
-  .impact-geo      { background: rgba(251,146,60,0.2);  color: #fb923c; }
-  .impact-trade    { background: rgba(234,179,8,0.2);   color: #facc15; }
-  .impact-macro    { background: rgba(168,85,247,0.2);  color: #c084fc; }
-  .impact-earnings { background: rgba(34,197,94,0.2);   color: #4ade80; }
-
-  .news-content { flex: 1; }
-
-  .news-title {
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1.4;
-    margin-bottom: 4px;
-  }
-
-  .news-meta {
-    font-size: 11px;
-    color: var(--muted);
-  }
-
-  .news-impact {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 6px;
-  }
-
-  .impact-high { background: rgba(229,57,53,0.2); color: #ef5350; }
-  .impact-mid  { background: rgba(255,152,0,0.2);  color: #ffa726; }
-  .impact-low  { background: rgba(100,116,139,0.2); color: #94a3b8; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --bg:#0a0d12; --surface:#111520; --surface2:#161b2e;
+  --border:#1e2535; --text:#e2e8f0; --muted:#64748b;
+  --gain5:#00c853; --gain3:#43a047; --gain1:#2e7d32;
+  --flat:#263238;
+  --loss1:#b71c1c; --loss3:#c62828; --loss5:#e53935;
+  --accent:#3b82f6;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:100;}
+.logo{font-size:18px;font-weight:700;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:8px;height:8px;background:var(--gain5);border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.8);}}
+.header-right{display:flex;align-items:center;gap:16px;}
+#refresh-info,#last-updated{font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.refresh-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Inter',sans-serif;transition:.2s;}
+.refresh-btn:hover{border-color:var(--accent);background:rgba(59,130,246,.08);}
+
+/* ── Stats bar ── */
+.stats-bar{display:flex;align-items:center;gap:24px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap;}
+.stat-item{display:flex;gap:6px;align-items:center;}
+.stat-label{color:var(--muted);}
+.stat-val{font-family:'JetBrains Mono',monospace;font-weight:600;}
+.stat-val.pos{color:var(--gain5);} .stat-val.neg{color:var(--loss5);}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;padding:16px 24px 0;border-bottom:1px solid var(--border);background:var(--bg);overflow-x:auto;}
+.tab{padding:8px 18px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border:1px solid transparent;border-bottom:none;transition:.2s;background:transparent;white-space:nowrap;}
+.tab:hover{color:var(--text);}
+.tab.active{background:var(--surface);border-color:var(--border);color:var(--text);position:relative;bottom:-1px;}
+
+/* ── Legend ── */
+.legend{display:flex;align-items:center;gap:6px;padding:10px 24px;font-size:11px;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border);}
+.legend-bar{display:flex;border-radius:4px;overflow:hidden;height:10px;}
+.legend-bar span{width:30px;display:inline-block;}
+.legend-label{font-family:'JetBrains Mono',monospace;font-size:11px;}
+
+/* ── Main ── */
+main{flex:1;padding:20px 24px;}
+.section-title{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+.heatmap-container{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:28px;min-height:80px;}
+
+/* ── Stock Tile ── */
+.stock-tile{
+  border-radius:8px;padding:8px 10px;cursor:pointer;
+  transition:transform .15s,box-shadow .15s,filter .15s;
+  display:flex;flex-direction:column;justify-content:space-between;
+  position:relative;overflow:hidden;min-width:80px;min-height:90px;
+}
+.stock-tile::before{content:'';position:absolute;inset:0;background:rgba(255,255,255,.03);pointer-events:none;}
+.stock-tile:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,.5);filter:brightness(1.12);z-index:10;}
+
+.tile-top{display:flex;align-items:center;gap:5px;margin-bottom:2px;}
+.tile-logo{width:16px;height:16px;border-radius:3px;object-fit:contain;background:rgba(255,255,255,.1);flex-shrink:0;}
+.tile-logo-placeholder{width:16px;height:16px;border-radius:3px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:rgba(255,255,255,.7);flex-shrink:0;}
+.tile-symbol{font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.95);letter-spacing:.3px;}
+.tile-name{font-size:8px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
+
+/* sparkline */
+.tile-spark{width:100%;height:22px;margin:2px 0;}
+.tile-spark svg{width:100%;height:100%;}
+
+.tile-bottom{}
+.tile-change{font-size:13px;font-weight:700;color:rgba(255,255,255,.95);font-family:'JetBrains Mono',monospace;}
+.tile-price{font-size:9px;color:rgba(255,255,255,.55);font-family:'JetBrains Mono',monospace;}
+.etf-badge{position:absolute;top:5px;right:5px;font-size:7px;font-weight:700;background:rgba(255,255,255,.15);border-radius:3px;padding:1px 4px;letter-spacing:.5px;}
+
+/* ── Tooltip ── */
+#tooltip{position:fixed;background:#1a2035;border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:13px;pointer-events:none;z-index:999;opacity:0;transition:opacity .15s;min-width:200px;box-shadow:0 16px 40px rgba(0,0,0,.5);}
+#tooltip.visible{opacity:1;}
+.tt-symbol{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;margin-bottom:4px;}
+.tt-name{color:var(--muted);font-size:11px;margin-bottom:10px;}
+.tt-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
+.tt-label{color:var(--muted);}
+.tt-val{font-family:'JetBrains Mono',monospace;font-weight:600;}
+.tt-val.pos{color:var(--gain5);} .tt-val.neg{color:var(--loss5);}
+
+/* ── Detail Panel (side drawer) ── */
+#detail-panel{
+  position:fixed;top:0;right:-480px;width:460px;max-width:95vw;height:100vh;
+  background:var(--surface2);border-left:1px solid var(--border);
+  z-index:500;transition:right .3s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#detail-panel.open{right:0;}
+.panel-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:499;opacity:0;pointer-events:none;transition:opacity .3s;}
+.panel-overlay.visible{opacity:1;pointer-events:auto;}
+
+.panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.panel-close{margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.2s;}
+.panel-close:hover{border-color:var(--text);color:var(--text);}
+.panel-logo-big{width:40px;height:40px;border-radius:8px;object-fit:contain;background:rgba(255,255,255,.08);}
+.panel-logo-placeholder{width:40px;height:40px;border-radius:8px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--text);}
+.panel-title-block{}
+.panel-symbol{font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.panel-name{font-size:12px;color:var(--muted);margin-top:2px;}
+
+.panel-body{flex:1;overflow-y:auto;padding:20px 24px;}
+.panel-price-row{display:flex;align-items:baseline;gap:12px;margin-bottom:20px;}
+.panel-price{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.panel-change{font-size:16px;font-weight:600;font-family:'JetBrains Mono',monospace;}
+.panel-change.pos{color:var(--gain5);} .panel-change.neg{color:var(--loss5);}
+
+.panel-chart{width:100%;height:80px;margin-bottom:20px;}
+.panel-chart svg{width:100%;height:100%;}
+
+.panel-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;}
+.panel-stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.panel-stat-label{font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;}
+.panel-stat-value{font-size:14px;font-weight:600;font-family:'JetBrains Mono',monospace;}
+
+.panel-section{margin-bottom:20px;}
+.panel-section-title{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.panel-desc{font-size:13px;line-height:1.7;color:#94a3b8;}
+.panel-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.panel-tag{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3);}
+
+/* ── Macro section ── */
+.macro-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:28px;}
+.macro-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:5px;transition:.2s;cursor:pointer;}
+.macro-card:hover{border-color:var(--accent);background:rgba(59,130,246,.05);transform:translateY(-2px);}
+.macro-label{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+.macro-value{font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.macro-change{font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:600;}
+.macro-change.pos{color:var(--gain5);} .macro-change.neg{color:var(--loss5);} .macro-change.neu{color:var(--muted);}
+.macro-desc{font-size:10px;color:var(--muted);}
+.macro-hint{font-size:9px;color:rgba(59,130,246,.6);margin-top:2px;}
+
+/* ── Macro detail panel ── */
+#macro-panel{
+  position:fixed;top:0;right:-480px;width:460px;max-width:95vw;height:100vh;
+  background:var(--surface2);border-left:1px solid var(--border);
+  z-index:500;transition:right .3s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#macro-panel.open{right:0;}
+.macro-panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.macro-panel-icon{font-size:32px;}
+.macro-panel-close{margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.2s;}
+.macro-panel-close:hover{border-color:var(--text);color:var(--text);}
+.macro-panel-body{flex:1;overflow-y:auto;padding:20px 24px;}
+.macro-explain-block{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;}
+.macro-explain-title{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
+.macro-explain-text{font-size:13px;line-height:1.75;color:#94a3b8;}
+.macro-impact-list{margin-top:8px;padding-left:16px;}
+.macro-impact-list li{font-size:13px;color:#94a3b8;line-height:1.8;margin-bottom:2px;}
+.macro-threshold{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.threshold-item{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;}
+
+/* ── News ── */
+.news-list{display:flex;flex-direction:column;gap:8px;}
+.news-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;gap:14px;align-items:flex-start;text-decoration:none;color:var(--text);transition:.2s;cursor:pointer;}
+.news-item:hover{border-color:var(--accent);background:rgba(59,130,246,.05);}
+.news-breaking{border-color:rgba(239,68,68,.4)!important;background:rgba(239,68,68,.04)!important;}
+.news-breaking:hover{border-color:rgba(239,68,68,.7)!important;background:rgba(239,68,68,.08)!important;}
+.news-left{display:flex;flex-direction:column;gap:4px;align-items:flex-start;flex-shrink:0;}
+.news-content{flex:1;}
+.news-title{font-size:13px;font-weight:500;line-height:1.4;margin-bottom:4px;}
+.news-desc{font-size:11px;color:var(--muted);line-height:1.5;margin:3px 0;}
+.news-meta{font-size:11px;color:var(--muted);}
+.news-section-label{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:8px 0 10px;display:flex;align-items:center;gap:8px;}
+.news-section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* badges */
+.news-source-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.news-impact{font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;}
+.badge-yahoo{background:#6001d2;color:#fff;}
+.badge-mw{background:#000;color:#fff;}
+.badge-investing{background:#e84040;color:#fff;}
+.badge-fed{background:#1a3a5c;color:#7eb8e8;border:1px solid #2a5a8c;}
+.impact-urgent{background:rgba(239,68,68,.25);color:#f87171;}
+.impact-fed{background:rgba(59,130,246,.2);color:#60a5fa;}
+.impact-geo{background:rgba(251,146,60,.2);color:#fb923c;}
+.impact-trade{background:rgba(234,179,8,.2);color:#facc15;}
+.impact-macro{background:rgba(168,85,247,.2);color:#c084fc;}
+.impact-earnings{background:rgba(34,197,94,.2);color:#4ade80;}
+.impact-low{background:rgba(100,116,139,.2);color:#94a3b8;}
+
+/* ── Loading ── */
+.loading-overlay{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;color:var(--muted);font-size:13px;width:100%;}
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">
-    <div class="logo-dot"></div>
-    股市熱力圖
-  </div>
+  <div class="logo"><div class="logo-dot"></div>股市熱力圖</div>
   <div class="header-right">
     <span id="last-updated">載入中...</span>
     <span id="refresh-info">60s 自動更新</span>
@@ -533,52 +207,32 @@
 </header>
 
 <div class="stats-bar">
-  <div class="stat-item">
-    <span class="stat-label">上漲</span>
-    <span class="stat-val pos" id="stat-up">-</span>
-  </div>
-  <div class="stat-item">
-    <span class="stat-label">下跌</span>
-    <span class="stat-val neg" id="stat-down">-</span>
-  </div>
-  <div class="stat-item">
-    <span class="stat-label">平盤</span>
-    <span class="stat-val" id="stat-flat" style="color:var(--muted)">-</span>
-  </div>
-  <div class="stat-item" style="margin-left:auto">
-    <span class="stat-label">🇹🇼 台股</span>
-    <span class="stat-val" style="color:var(--muted)">Yahoo（延遲15分）</span>
-  </div>
-  <div class="stat-item">
-    <span class="stat-label">🇺🇸 美股</span>
-    <span class="stat-val" style="color:var(--accent)">Finnhub（即時）</span>
-  </div>
+  <div class="stat-item"><span class="stat-label">上漲</span><span class="stat-val pos" id="stat-up">-</span></div>
+  <div class="stat-item"><span class="stat-label">下跌</span><span class="stat-val neg" id="stat-down">-</span></div>
+  <div class="stat-item"><span class="stat-label">平盤</span><span class="stat-val" id="stat-flat" style="color:var(--muted)">-</span></div>
+  <div class="stat-item" style="margin-left:auto"><span class="stat-label">🇹🇼 台股</span><span class="stat-val" style="color:var(--muted)">Yahoo（延遲15分）</span></div>
+  <div class="stat-item"><span class="stat-label">🇺🇸 美股</span><span class="stat-val" style="color:var(--accent)">Finnhub（即時）</span></div>
 </div>
 
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('all', this)">🌐 全部</button>
-  <button class="tab" onclick="switchTab('tw', this)">🇹🇼 台股</button>
-  <button class="tab" onclick="switchTab('us', this)">🇺🇸 美股</button>
-  <button class="tab" onclick="switchTab('etf', this)">📦 ETF</button>
-  <button class="tab" onclick="switchTab('macro', this)">🌐 總經分析</button>
+  <button class="tab active" onclick="switchTab('all',this)">🌐 全部</button>
+  <button class="tab" onclick="switchTab('tw',this)">🇹🇼 台股</button>
+  <button class="tab" onclick="switchTab('us',this)">🇺🇸 美股</button>
+  <button class="tab" onclick="switchTab('etf',this)">📦 ETF</button>
+  <button class="tab" onclick="switchTab('macro',this)">📊 總經分析</button>
 </div>
 
 <div class="legend">
   <span>漲跌幅：</span>
   <div class="legend-bar">
-    <span style="background:#00c853"></span>
-    <span style="background:#43a047"></span>
-    <span style="background:#2e7d32"></span>
+    <span style="background:#00c853"></span><span style="background:#43a047"></span><span style="background:#2e7d32"></span>
     <span style="background:#263238"></span>
-    <span style="background:#b71c1c"></span>
-    <span style="background:#c62828"></span>
-    <span style="background:#e53935"></span>
+    <span style="background:#b71c1c"></span><span style="background:#c62828"></span><span style="background:#e53935"></span>
   </div>
-  <span class="legend-label">+5%</span>
-  <span style="flex:1"></span>
-  <span class="legend-label">0%</span>
-  <span style="flex:1"></span>
+  <span class="legend-label">+5%</span><span style="flex:1"></span>
+  <span class="legend-label">0%</span><span style="flex:1"></span>
   <span class="legend-label">-5%</span>
+  <span style="margin-left:16px;color:var(--muted);font-size:11px">點擊格子查看公司介紹</span>
 </div>
 
 <main id="main-content">
@@ -591,31 +245,62 @@
     <div class="heatmap-container" id="heatmap-tw-etf"></div>
   </div>
   <div id="section-us">
-    <div class="section-title">美股 · 科技 / AI</div>
+    <div class="section-title">美股 · 科技 / AI / 太空</div>
     <div class="heatmap-container" id="heatmap-us"></div>
   </div>
-
-  <!-- 總經分析區塊 -->
   <div id="section-macro" style="display:none">
-    <div class="section-title">總經指標 · 影響美股關鍵數據</div>
-    <div id="macro-grid" class="macro-grid">
-      <div class="loading-overlay"><div class="spinner"></div>抓取總經資料中...</div>
-    </div>
-
-    <div class="section-title" style="margin-top:28px">財經新聞 · Reuters / Yahoo Finance</div>
-    <div id="news-list" class="news-list">
-      <div class="loading-overlay"><div class="spinner"></div>載入新聞中...</div>
-    </div>
+    <div class="section-title">總經指標 · 點擊任一卡片查看說明</div>
+    <div id="macro-grid" class="macro-grid"><div class="loading-overlay"><div class="spinner"></div>抓取資料中...</div></div>
+    <div class="section-title" style="margin-top:8px">財經新聞</div>
+    <div id="news-list" class="news-list"><div class="loading-overlay"><div class="spinner"></div>載入新聞中...</div></div>
   </div>
 </main>
 
+<!-- Stock detail panel -->
+<div class="panel-overlay" id="panel-overlay" onclick="closePanel()"></div>
+<div id="detail-panel">
+  <div class="panel-header">
+    <div id="panel-logo-wrap"></div>
+    <div class="panel-title-block">
+      <div class="panel-symbol" id="panel-symbol"></div>
+      <div class="panel-name" id="panel-name"></div>
+    </div>
+    <button class="panel-close" onclick="closePanel()">✕</button>
+  </div>
+  <div class="panel-body">
+    <div class="panel-price-row">
+      <div class="panel-price" id="panel-price"></div>
+      <div class="panel-change" id="panel-change"></div>
+    </div>
+    <div class="panel-chart" id="panel-chart"></div>
+    <div class="panel-stats" id="panel-stats"></div>
+    <div class="panel-section">
+      <div class="panel-section-title">公司介紹</div>
+      <div class="panel-desc" id="panel-desc"></div>
+      <div class="panel-tags" id="panel-tags"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Macro detail panel -->
+<div id="macro-panel">
+  <div class="macro-panel-header">
+    <div class="macro-panel-icon" id="mpanel-icon"></div>
+    <div>
+      <div class="panel-symbol" id="mpanel-title"></div>
+      <div class="panel-name" id="mpanel-subtitle"></div>
+    </div>
+    <button class="macro-panel-close" onclick="closeMacroPanel()">✕</button>
+  </div>
+  <div class="macro-panel-body" id="mpanel-body"></div>
+</div>
+
+<!-- Tooltip -->
 <div id="tooltip">
   <div class="tt-symbol" id="tt-symbol"></div>
   <div class="tt-name" id="tt-name"></div>
   <div class="tt-row"><span class="tt-label">現價</span><span class="tt-val" id="tt-price"></span></div>
-  <div class="tt-row"><span class="tt-label">漲跌</span><span class="tt-val" id="tt-change"></span></div>
   <div class="tt-row"><span class="tt-label">漲跌幅</span><span class="tt-val" id="tt-pct"></span></div>
-  <div class="tt-row"><span class="tt-label">開盤</span><span class="tt-val" id="tt-open"></span></div>
   <div class="tt-row"><span class="tt-label">最高</span><span class="tt-val" id="tt-high"></span></div>
   <div class="tt-row"><span class="tt-label">最低</span><span class="tt-val" id="tt-low"></span></div>
 </div>
@@ -623,77 +308,261 @@
 <script>
 const API_KEY = 'd8p5eb1r01qp954vb26gd8p5eb1r01qp954vb270';
 
+// ── Stock lists ──
 const TW_STOCKS = [
-  { symbol: '2330.TW', name: '台積電', size: 9 },
-  { symbol: '2317.TW', name: '鴻海', size: 6 },
-  { symbol: '2454.TW', name: '聯發科', size: 6 },
-  { symbol: '3008.TW', name: '大立光', size: 4 },
-  { symbol: '2382.TW', name: '廣達', size: 5 },
-  { symbol: '2357.TW', name: '華碩', size: 4 },
-  { symbol: '2412.TW', name: '中華電', size: 4 },
-  { symbol: '2308.TW', name: '台達電', size: 5 },
-  { symbol: '2303.TW', name: '聯電', size: 4 },
-  { symbol: '2891.TW', name: '中信金', size: 4 },
-  { symbol: '2881.TW', name: '富邦金', size: 4 },
-  { symbol: '2882.TW', name: '國泰金', size: 4 },
-  { symbol: '3711.TW', name: '日月光投控', size: 4 },
-  { symbol: '2886.TW', name: '兆豐金', size: 3 },
-  { symbol: '2395.TW', name: '研華', size: 3 },
-  { symbol: '6505.TW', name: '台塑化', size: 3 },
-  { symbol: '1301.TW', name: '台塑', size: 3 },
-  { symbol: '2002.TW', name: '中鋼', size: 3 },
-  { symbol: '2376.TW', name: '技嘉', size: 3 },
-  { symbol: '2379.TW', name: '瑞昱', size: 3 },
+  {symbol:'2330.TW',name:'台積電',size:9,domain:'tsmc.com'},
+  {symbol:'2317.TW',name:'鴻海',size:6,domain:'foxconn.com'},
+  {symbol:'2454.TW',name:'聯發科',size:6,domain:'mediatek.com'},
+  {symbol:'3008.TW',name:'大立光',size:4,domain:'largan.com.tw'},
+  {symbol:'2382.TW',name:'廣達',size:5,domain:'quanta.com.tw'},
+  {symbol:'2357.TW',name:'華碩',size:4,domain:'asus.com'},
+  {symbol:'2412.TW',name:'中華電',size:4,domain:'cht.com.tw'},
+  {symbol:'2308.TW',name:'台達電',size:5,domain:'deltaww.com'},
+  {symbol:'2303.TW',name:'聯電',size:4,domain:'umc.com'},
+  {symbol:'2891.TW',name:'中信金',size:4,domain:'ctbcholding.com'},
+  {symbol:'2881.TW',name:'富邦金',size:4,domain:'fubon.com'},
+  {symbol:'2882.TW',name:'國泰金',size:4,domain:'cathayholdings.com.tw'},
+  {symbol:'3711.TW',name:'日月光投控',size:4,domain:'aseglobal.com'},
+  {symbol:'2886.TW',name:'兆豐金',size:3,domain:'megaholdings.com.tw'},
+  {symbol:'2395.TW',name:'研華',size:3,domain:'advantech.com'},
+  {symbol:'6505.TW',name:'台塑化',size:3,domain:'fpcc.com.tw'},
+  {symbol:'1301.TW',name:'台塑',size:3,domain:'fpc.com.tw'},
+  {symbol:'2002.TW',name:'中鋼',size:3,domain:'csc.com.tw'},
+  {symbol:'2376.TW',name:'技嘉',size:3,domain:'gigabyte.com'},
+  {symbol:'2379.TW',name:'瑞昱',size:3,domain:'realtek.com'},
 ];
 
 const TW_ETFS = [
-  { symbol: '0050.TW', name: '元大台灣50', size: 5, etf: true },
-  { symbol: '0056.TW', name: '元大高股息', size: 4, etf: true },
-  { symbol: '00878.TW', name: '國泰永續高股息', size: 5, etf: true },
-  { symbol: '00919.TW', name: '群益台灣精選高息', size: 4, etf: true },
-  { symbol: '006208.TW', name: '富邦台50', size: 4, etf: true },
-  { symbol: '00929.TW', name: '復華台灣科技優息', size: 3, etf: true },
-  { symbol: '00940.TW', name: '元大台灣價值高息', size: 3, etf: true },
+  {symbol:'0050.TW',name:'元大台灣50',size:5,etf:true,domain:'yuantafunds.com'},
+  {symbol:'0056.TW',name:'元大高股息',size:4,etf:true,domain:'yuantafunds.com'},
+  {symbol:'00878.TW',name:'國泰永續高股息',size:5,etf:true,domain:'cathaysite.com.tw'},
+  {symbol:'00919.TW',name:'群益台灣精選高息',size:4,etf:true,domain:'capitalfund.com.tw'},
+  {symbol:'006208.TW',name:'富邦台50',size:4,etf:true,domain:'fubon.com'},
+  {symbol:'00929.TW',name:'復華台灣科技優息',size:3,etf:true,domain:'fhtrust.com.tw'},
+  {symbol:'00940.TW',name:'元大台灣價值高息',size:3,etf:true,domain:'yuantafunds.com'},
 ];
 
 const US_STOCKS = [
-  { symbol: 'NVDA', name: 'NVIDIA', size: 9 },
-  { symbol: 'MSFT', name: 'Microsoft', size: 8 },
-  { symbol: 'AAPL', name: 'Apple', size: 8 },
-  { symbol: 'GOOGL', name: 'Alphabet', size: 7 },
-  { symbol: 'META', name: 'Meta', size: 7 },
-  { symbol: 'AMZN', name: 'Amazon', size: 7 },
-  { symbol: 'TSLA', name: 'Tesla', size: 6 },
-  { symbol: 'AMD', name: 'AMD', size: 5 },
-  { symbol: 'AVGO', name: 'Broadcom', size: 5 },
-  { symbol: 'INTC', name: 'Intel', size: 4 },
-  { symbol: 'QCOM', name: 'Qualcomm', size: 4 },
-  { symbol: 'ORCL', name: 'Oracle', size: 5 },
-  { symbol: 'CRM', name: 'Salesforce', size: 4 },
-  { symbol: 'PLTR', name: 'Palantir', size: 4 },
-  { symbol: 'ARM', name: 'ARM Holdings', size: 4 },
-  { symbol: 'SMCI', name: 'Super Micro', size: 3 },
-  { symbol: 'TSM', name: 'TSMC ADR', size: 6 },
-  { symbol: 'NFLX', name: 'Netflix', size: 5 },
-  { symbol: 'UBER', name: 'Uber', size: 4 },
-  { symbol: 'ASML', name: 'ASML', size: 4 },
-  { symbol: 'SPCX', name: 'SpaceX', size: 5 },
-  { symbol: 'NOK', name: 'Nokia', size: 3 },
-  { symbol: 'MU', name: 'Micron', size: 4 },
-  { symbol: 'MRVL', name: 'Marvell Tech', size: 4 },
-  { symbol: 'QQQ', name: 'Nasdaq 100 ETF', size: 5, etf: true },
-  { symbol: 'QQQM', name: 'Nasdaq 100 Mini ETF', size: 4, etf: true },
-  { symbol: 'VOO', name: 'S&P 500 ETF', size: 5, etf: true },
-  { symbol: 'VTI', name: 'Total Market ETF', size: 4, etf: true },
+  {symbol:'NVDA',name:'NVIDIA',size:9,domain:'nvidia.com'},
+  {symbol:'MSFT',name:'Microsoft',size:8,domain:'microsoft.com'},
+  {symbol:'AAPL',name:'Apple',size:8,domain:'apple.com'},
+  {symbol:'GOOGL',name:'Alphabet',size:7,domain:'abc.xyz'},
+  {symbol:'META',name:'Meta',size:7,domain:'meta.com'},
+  {symbol:'AMZN',name:'Amazon',size:7,domain:'amazon.com'},
+  {symbol:'TSLA',name:'Tesla',size:6,domain:'tesla.com'},
+  {symbol:'AMD',name:'AMD',size:5,domain:'amd.com'},
+  {symbol:'AVGO',name:'Broadcom',size:5,domain:'broadcom.com'},
+  {symbol:'INTC',name:'Intel',size:4,domain:'intel.com'},
+  {symbol:'QCOM',name:'Qualcomm',size:4,domain:'qualcomm.com'},
+  {symbol:'ORCL',name:'Oracle',size:5,domain:'oracle.com'},
+  {symbol:'CRM',name:'Salesforce',size:4,domain:'salesforce.com'},
+  {symbol:'PLTR',name:'Palantir',size:4,domain:'palantir.com'},
+  {symbol:'ARM',name:'ARM Holdings',size:4,domain:'arm.com'},
+  {symbol:'SMCI',name:'Super Micro',size:3,domain:'supermicro.com'},
+  {symbol:'TSM',name:'TSMC ADR',size:6,domain:'tsmc.com'},
+  {symbol:'NFLX',name:'Netflix',size:5,domain:'netflix.com'},
+  {symbol:'UBER',name:'Uber',size:4,domain:'uber.com'},
+  {symbol:'ASML',name:'ASML',size:4,domain:'asml.com'},
+  {symbol:'SPCX',name:'SpaceX',size:5,domain:'spacex.com'},
+  {symbol:'NOK',name:'Nokia',size:3,domain:'nokia.com'},
+  {symbol:'MU',name:'Micron',size:4,domain:'micron.com'},
+  {symbol:'MRVL',name:'Marvell Tech',size:4,domain:'marvell.com'},
+  {symbol:'QQQ',name:'Nasdaq 100 ETF',size:5,etf:true,domain:'invesco.com'},
+  {symbol:'QQQM',name:'Nasdaq 100 Mini',size:4,etf:true,domain:'invesco.com'},
+  {symbol:'VOO',name:'S&P 500 ETF',size:5,etf:true,domain:'vanguard.com'},
+  {symbol:'VTI',name:'Total Market ETF',size:4,etf:true,domain:'vanguard.com'},
 ];
 
+// ── Company descriptions ──
+const COMPANY_INFO = {
+  '2330.TW':{desc:'台灣積體電路製造公司，全球最大的獨立半導體晶圓代工廠。為 Apple、NVIDIA、AMD 等科技巨頭製造最先進的晶片，擁有全球最領先的製程技術（3nm、2nm）。台積電的技術發展直接影響全球科技產業走向。',tags:['半導體','晶圓代工','AI晶片','台灣護國神山']},
+  '2317.TW':{desc:'鴻海精密工業（富士康），全球最大電子代工廠。主要為 Apple 組裝 iPhone、iPad，同時也是電動車、AI 伺服器製造的重要玩家。在全球擁有超過百萬名員工。',tags:['電子代工','EMS','電動車','AI伺服器']},
+  '2454.TW':{desc:'聯發科技，台灣最大無晶圓廠半導體公司。主要產品涵蓋智慧型手機晶片（天璣系列）、Wi-Fi、藍牙、4G/5G 基頻晶片，客戶遍及三星、小米、OPPO 等品牌。',tags:['IC設計','5G','手機晶片','物聯網']},
+  '2382.TW':{desc:'廣達電腦，全球最大筆記型電腦代工廠之一。近年來成為 AI 伺服器（尤其是 Meta、Google 用的雲端伺服器）的重要製造商，受益於 AI 基礎建設投資熱潮。',tags:['NB代工','AI伺服器','雲端硬體']},
+  '2308.TW':{desc:'台達電子，全球最大電源供應器製造商，在工業自動化、電動車充電設備領域快速成長。也是資料中心電源解決方案的領導品牌，受 AI 伺服器用電需求大幅帶動。',tags:['電源管理','工業自動化','EV充電','資料中心']},
+  '2303.TW':{desc:'聯華電子（聯電），全球前三大半導體晶圓代工廠。專注於成熟製程（28nm 以上），主要客戶為消費性電子、車用半導體廠商。近年積極擴廠應對車用晶片需求。',tags:['晶圓代工','成熟製程','車用半導體']},
+  '3008.TW':{desc:'大立光電，全球最大智慧型手機鏡頭模組製造商，為 Apple iPhone 供應高階鏡頭。技術門檻極高，毛利率長期超過 60%，是台灣股王代表。',tags:['光學鏡頭','iPhone供應鏈','高毛利']},
+  '2357.TW':{desc:'華碩電腦，台灣知名電腦品牌，產品涵蓋筆記型電腦、顯示卡（ROG、TUF）、主機板、手機。近年受惠於 AI PC 風潮與電競市場成長。',tags:['電腦品牌','顯示卡','電競','AI PC']},
+  '2412.TW':{desc:'中華電信，台灣最大電信公司，提供固網、行動通訊（5G）、寬頻及企業雲端服務。獲利穩定、現金殖利率高，是台股防禦型投資標的。',tags:['電信','5G','雲端','高股息']},
+  '2891.TW':{desc:'中信金融控股，旗下包含中國信託商業銀行、台灣人壽等，是台灣最大的民營金融集團之一，業務遍及亞太地區。',tags:['金融控股','銀行','壽險','東南亞']},
+  '2881.TW':{desc:'富邦金融控股，旗下含台北富邦銀行、富邦人壽、富邦產險、富邦證券，為台灣最大金控之一，也積極布局中國大陸市場。',tags:['金融控股','銀行','壽險','投資']},
+  '2882.TW':{desc:'國泰金融控股，旗下國泰人壽是台灣最大壽險公司。資產規模龐大，投資標的多元，股息殖利率穩定，是台股長期投資人常見持股。',tags:['金融控股','壽險','資產管理']},
+  '3711.TW':{desc:'日月光投控，全球最大半導體封裝測試（OSAT）公司。晶片製造完成後的封裝與測試是不可或缺的環節，日月光在 AI 晶片封裝領域具關鍵地位。',tags:['半導體封裝','測試','CoWoS','AI晶片']},
+  '2395.TW':{desc:'研華科技，全球工業電腦（IPC）領導品牌。產品廣泛應用於工廠自動化、醫療設備、交通、智慧城市，是工業 IoT 的核心廠商。',tags:['工業電腦','IoT','自動化','醫療設備']},
+  '2376.TW':{desc:'技嘉科技，全球知名主機板與顯示卡製造商，在 AI 伺服器 GPU 系統（GeForce、A100/H100 伺服器）方面受益明顯，也生產 AI 工作站。',tags:['主機板','顯示卡','AI伺服器','電競']},
+  '2379.TW':{desc:'瑞昱半導體，全球最大網路晶片與音效晶片 IC 設計公司之一。產品涵蓋網路交換器晶片、Wi-Fi、藍牙、音效 IC，廣泛用於 PC 與網通設備。',tags:['IC設計','網路晶片','音效','Wi-Fi']},
+  'NVDA':{desc:'NVIDIA 是全球最重要的 AI 晶片公司，其 GPU（H100、B200）是訓練大型語言模型（ChatGPT、Gemini 等）的核心硬體。近年因 AI 浪潮爆發式成長，市值一度超過 3 兆美元，被視為「AI 時代的鏟子供應商」。',tags:['GPU','AI訓練','資料中心','遊戲','自駕車']},
+  'MSFT':{desc:'微軟是全球最大軟體公司，旗下有 Windows、Office、Azure 雲端平台，並重押 OpenAI（ChatGPT 開發商）。Azure AI 服務快速成長，是企業 AI 轉型最重要的基礎設施之一。',tags:['雲端','AI','Office','OpenAI','企業軟體']},
+  'AAPL':{desc:'蘋果公司是全球市值最高的企業之一，以 iPhone、Mac、iPad、Apple Watch 等硬體聞名，並靠 App Store、iCloud、Apple Music 等服務賺取高利潤。近年積極發展 Apple Silicon 晶片與 Apple Intelligence AI 功能。',tags:['iPhone','Mac','服務收入','Apple Silicon','AI']},
+  'GOOGL':{desc:'Alphabet 是 Google 的母公司，旗下擁有搜尋引擎（全球佔有率約 90%）、YouTube、Google Cloud、Android 等。生成式 AI（Gemini）的推出讓 Google 重新鞏固其 AI 領先地位，廣告收入仍是主要獲利來源。',tags:['搜尋引擎','廣告','雲端','YouTube','AI']},
+  'META':{desc:'Meta 擁有 Facebook、Instagram、WhatsApp，每月活躍用戶超過 30 億。近年大力投資 AI（Llama 開源模型）和元宇宙（VR/AR，Orion 眼鏡），廣告業務因 AI 精準投放而持續強勁。',tags:['社群媒體','廣告','AI','元宇宙','VR']},
+  'AMZN':{desc:'Amazon 是全球最大電商平台，也是全球最大雲端服務商（AWS，市佔約 31%）。AWS 是全公司最重要的獲利引擎，AI 服務（Bedrock、Nova）快速成長。同時也是 Prime Video 等串流媒體的重要玩家。',tags:['電商','AWS雲端','AI','物流','串流']},
+  'TSLA':{desc:'特斯拉是全球最知名的電動車品牌，也是能源儲存（Powerwall/Megapack）、太陽能的領導者。自駕技術（FSD）和機器人（Optimus）是未來的重大賭注。CEO 馬斯克的言行對股價影響極大。',tags:['電動車','自駕','機器人','能源儲存','馬斯克']},
+  'AMD':{desc:'超微半導體是 NVIDIA 在 AI GPU 領域的最主要競爭者，其 MI300X 系列 GPU 正積極搶占資料中心市場。在 CPU 市場，Ryzen/EPYC 處理器大幅侵蝕英特爾的市佔率。',tags:['GPU','CPU','AI晶片','伺服器','NVIDIA競爭者']},
+  'AVGO':{desc:'Broadcom 是全球最大的網路半導體公司，產品涵蓋資料中心交換器晶片、Wi-Fi、儲存控制器。也替 Google 和 Apple 設計客製化 AI 晶片（ASIC），是 AI 基礎設施的隱形冠軍。',tags:['網路晶片','ASIC','AI','資料中心','Wi-Fi']},
+  'INTC':{desc:'英特爾曾是全球最大半導體公司，近年在製程技術上落後台積電、三星，市佔被 AMD 蠶食。目前正推動晶圓代工轉型（Intel Foundry），是半導體業最受關注的復甦故事之一。',tags:['CPU','晶圓代工','PC','伺服器','轉型']},
+  'QCOM':{desc:'高通是全球最大手機基頻晶片公司，幾乎所有 Android 高端手機都搭載其 Snapdragon 處理器。也積極布局 AI PC（Snapdragon X）、汽車晶片，企圖減少對手機市場的依賴。',tags:['手機晶片','5G基頻','AI PC','汽車','授權']},
+  'ORCL':{desc:'甲骨文是全球最大資料庫軟體公司，近年因 AI 基礎設施需求爆發，其雲端服務（OCI）成長大超預期。與 OpenAI、Microsoft 等 AI 公司簽下巨額雲端合約，是 AI 基礎設施的意外受益者。',tags:['資料庫','雲端','AI','企業軟體','ERP']},
+  'CRM':{desc:'Salesforce 是全球最大客戶關係管理（CRM）軟體公司，產品幫助企業管理銷售、行銷和客服。近年大力整合 AI（Agentforce），讓 AI Agent 自動處理業務流程，是企業 AI 軟體的代表。',tags:['CRM','企業軟體','AI Agent','SaaS','雲端']},
+  'PLTR':{desc:'Palantir 是一家數據分析與 AI 軟體公司，最初替美國政府（CIA、NSA）做情報分析，後來拓展到企業市場。其 AIP 平台讓企業能用 AI 做決策分析，是政府與國防 AI 的重要廠商。',tags:['AI分析','政府','國防','大數據','AIP']},
+  'ARM':{desc:'ARM Holdings 是全球最重要的處理器架構授權公司。幾乎所有手機晶片（蘋果 A 系列、高通 Snapdragon、聯發科天璣）都基於 ARM 架構。Apple Silicon、NVIDIA Grace CPU 也使用 ARM，是半導體業的「底層語言」。',tags:['晶片架構','授權','手機','AI','ARM架構']},
+  'SMCI':{desc:'Super Micro Computer 是 AI 伺服器製造商，為資料中心提供搭載 NVIDIA GPU 的高效能伺服器系統。受 AI 浪潮帶動快速成長，曾是美股漲幅最大的股票之一，但也經歷財務申報延遲的風波。',tags:['AI伺服器','GPU伺服器','資料中心','散熱']},
+  'TSM':{desc:'台積電 ADR，在美國紐約證券交易所掛牌的台積電美國存託憑證（ADR），讓美國投資人可以直接投資台積電。每股 ADR 代表 5 股台灣股票。走勢與台灣上市的 2330.TW 相同，但以美元計價。',tags:['台積電','ADR','半導體','美元計價']},
+  'NFLX':{desc:'Netflix 是全球最大串流影音平台，訂閱用戶超過 3 億。近年推出含廣告的低價方案並打擊帳號共享，帶動用戶與收入大幅成長。也積極投資遊戲和實境節目，內容版圖持續擴張。',tags:['串流','影音','訂閱制','廣告','內容']},
+  'UBER':{desc:'Uber 是全球最大的叫車平台，也是 Uber Eats 外送服務的母公司。近年轉虧為盈，自動駕駛計程車（Robotaxi）成為未來重要布局，與 Waymo 等合作拓展無人車叫車服務。',tags:['叫車','外送','Robotaxi','平台','共享經濟']},
+  'ASML':{desc:'ASML 是全球唯一能製造極紫外線（EUV）光刻機的公司，是先進半導體製造不可或缺的設備商。台積電、三星、英特爾都高度依賴 ASML 的機器來生產最先進晶片。被荷蘭政府視為國家戰略資產。',tags:['光刻機','EUV','半導體設備','荷蘭','壟斷技術']},
+  'SPCX':{desc:'SpaceX 是由 Elon Musk 創立的太空科技公司，2025 年正式在 Nasdaq 掛牌上市。旗下業務包含可重複使用火箭（Falcon 9、Starship）、全球衛星寬頻網路（Starlink，擁有約 10,000 顆衛星）、以及 2026 年收購 xAI 後整合的 Grok AI 服務與 X 平台。2025 年營收達 187 億美元，是全球商業太空市場的絕對領導者。',tags:['太空','Starlink','Starship','衛星網路','AI','馬斯克']},
+  'NOK':{desc:'諾基亞是芬蘭跨國通訊設備公司，從手機品牌轉型為 5G 網路基礎設施供應商，為全球電信業者提供基地台、核心網路設備。也積極發展 6G 技術研究，是電信設備市場三大玩家之一。',tags:['5G','電信設備','基礎設施','芬蘭','6G']},
+  'MU':{desc:'Micron Technology 是美國最大記憶體晶片製造商，生產 DRAM 和 NAND Flash 記憶體。AI 伺服器需要大量高頻寬記憶體（HBM），Micron 的 HBM3E 正大量供貨給 NVIDIA，是 AI 記憶體浪潮的核心受益者。',tags:['記憶體','DRAM','HBM','AI','NAND']},
+  'MRVL':{desc:'Marvell Technology 是一家主要針對資料中心設計客製化 AI 晶片（ASIC）和高速網路連接晶片的半導體公司。Amazon、Google 等雲端巨頭委託 Marvell 設計專屬 AI 晶片，是繼 Broadcom 之後最重要的 ASIC 設計廠。',tags:['ASIC','AI晶片','資料中心','雲端','網路']},
+  'QQQ':{desc:'Invesco QQQ 是追蹤 Nasdaq 100 指數的 ETF，涵蓋 100 支在 Nasdaq 上市的最大型非金融股，以 Apple、Microsoft、NVIDIA、Amazon 等科技巨頭為主。是美國交易量最大的 ETF 之一，費用率 0.20%。',tags:['ETF','Nasdaq100','科技股','被動投資','大型股']},
+  'QQQM':{desc:'Invesco QQQM 是 QQQ 的「迷你版」，同樣追蹤 Nasdaq 100 指數，但每股價格更低、費用率更便宜（0.15%），專門為長期買入持有的散戶設計。與 QQQ 績效幾乎相同。',tags:['ETF','Nasdaq100','低費用率','長期投資','散戶友善']},
+  'VOO':{desc:'Vanguard S&P 500 ETF 追蹤美國最重要的股票指數 S&P 500，包含美股市值最大的 500 家公司。費用率極低（0.03%），是巴菲特多次公開推薦的長期投資工具，適合追求穩健成長的投資人。',tags:['ETF','S&P500','被動投資','費用率低','長期']},
+  'VTI':{desc:'Vanguard Total Stock Market ETF 追蹤美國整體股市，涵蓋超過 3,500 家大中小型股，比 VOO 更分散。費用率同樣僅 0.03%，是想投資「全美股市」最簡單的方式。',tags:['ETF','全市場','分散投資','被動投資','小型股']},
+  // TW ETFs
+  '0050.TW':{desc:'元大台灣50 ETF 追蹤台灣最大的 50 家上市公司，台積電占比約 50%。是台股最知名、流動性最高的 ETF，費用率約 0.46%，適合長期存股投資人。成立於 2003 年，是台灣 ETF 市場的開創者。',tags:['ETF','台股大型股','指數投資','台積電','長期']},
+  '0056.TW':{desc:'元大台灣高股息 ETF，從台灣前 150 大上市公司中挑選未來一年預期殖利率最高的 30 支股票組成。每年配息一次（近年改為季配），主打高股息策略，適合追求被動收入的投資人。',tags:['ETF','高股息','季配息','台股','收益型']},
+  '00878.TW':{desc:'國泰永續高股息 ETF，結合 ESG 永續概念與高股息策略，從 MSCI 台灣 ESG 標準指數中選出高股息成分股。每季配息，近幾年配息率亮眼，是台灣最熱門的 ETF 之一，規模超過 3,000 億台幣。',tags:['ETF','高股息','ESG','季配息','永續']},
+  '00919.TW':{desc:'群益台灣精選高息 ETF，從台灣市場篩選高殖利率且股價動能佳的股票，兼顧高股息與成長性。每季配息，近年吸引大量存股族資金流入，規模快速擴張。',tags:['ETF','高股息','動能','季配息','台股']},
+  '006208.TW':{desc:'富邦台灣采吉50 ETF（俗稱「富邦台50」），同樣追蹤台灣前50大上市公司，與元大0050類似，但費用率更低（0.23%），是0050的平價替代選擇。適合長期追蹤台股大盤的投資人。',tags:['ETF','台灣50','低費用率','指數投資','長期']},
+  '00929.TW':{desc:'復華台灣科技優息 ETF，聚焦台灣科技股並兼顧高股息，成分股以半導體、電子製造業為主。每月配息（月月配），是近年大受散戶歡迎的「月配息 ETF」代表，規模成長快速。',tags:['ETF','科技股','月配息','高股息','半導體']},
+  '00940.TW':{desc:'元大台灣價值高息 ETF，以「價值」與「高息」雙重篩選條件選股，挑選本益比低、殖利率高的台股。每季配息，是元大針對價值投資族群推出的新一代高股息 ETF 產品。',tags:['ETF','高股息','價值投資','季配息','台股']},
+};
+
+// ── Macro indicators ──
+const MACRO_SYMBOLS = [
+  {symbol:'^GSPC', label:'S&P 500',       icon:'📈', unit:'', desc:'美股大盤指數'},
+  {symbol:'^IXIC', label:'Nasdaq',         icon:'💻', unit:'', desc:'科技股指數'},
+  {symbol:'^DJI',  label:'道瓊工業',       icon:'🏭', unit:'', desc:'藍籌股指數'},
+  {symbol:'^TNX',  label:'美債10年期',     icon:'🏦', unit:'%', desc:'殖利率↑ → 股市壓力'},
+  {symbol:'^VIX',  label:'VIX 恐慌指數',  icon:'😨', unit:'', desc:'>30 市場恐慌'},
+  {symbol:'DX-Y.NYB',label:'美元指數 DXY',icon:'💵', unit:'', desc:'強美元 → 壓抑出口'},
+  {symbol:'CL=F',  label:'原油 WTI',       icon:'🛢️', unit:'$', desc:'油價↑ → 通膨壓力'},
+  {symbol:'GC=F',  label:'黃金',           icon:'🥇', unit:'$', desc:'避險需求指標'},
+  {symbol:'BTC-USD',label:'Bitcoin',       icon:'₿',  unit:'$', desc:'風險情緒指標'},
+  {symbol:'EURUSD=X',label:'EUR/USD',      icon:'🇪🇺', unit:'', desc:'歐元匯率'},
+  {symbol:'TWD=X', label:'USD/TWD',        icon:'🇹🇼', unit:'', desc:'台幣匯率'},
+  {symbol:'^FVX',  label:'美債5年期',      icon:'📋', unit:'%', desc:'中期利率走勢'},
+];
+
+// ── Macro explanations ──
+const MACRO_EXPLAIN = {
+  '^GSPC':{
+    title:'S&P 500 指數',
+    intro:'S&P 500（Standard & Poor\'s 500）是追蹤美國 500 家最大上市公司的股票指數，由標準普爾公司編制。涵蓋科技、金融、醫療、消費等各產業，代表美國整體股市約 80% 的市值。',
+    sections:[
+      {title:'為什麼重要？',text:'S&P 500 是全球最重要的股票指數，投資人和基金經理人普遍以它作為「市場基準」。美國養老金、大學捐贈基金、各國央行外匯儲備都大量投資追蹤此指數的 ETF（如 VOO、SPY）。'},
+      {title:'如何影響市場？',text:'當 S&P 500 上漲，代表美股整體向好，風險偏好提升，資金通常也流入台股等新興市場。若 S&P 500 大跌，台股往往隔日跟跌。'},
+      {title:'重要門檻',items:['上漲 20% 以上：進入「牛市（Bull Market）」','下跌 20% 以上：進入「熊市（Bear Market）」','單日跌幅 >7%：觸發熔斷機制，暫停交易']},
+    ]
+  },
+  '^IXIC':{
+    title:'Nasdaq 綜合指數',
+    intro:'Nasdaq 是美國第二大股票交易所，Nasdaq 綜合指數涵蓋在此上市的所有股票（超過 3,000 支），以科技股為主，包含 Apple、Microsoft、NVIDIA、Meta 等科技巨頭。',
+    sections:[
+      {title:'與 S&P 500 的差異',text:'Nasdaq 科技股比重更高（科技業約占 50%+），因此波動更大、對利率更敏感。升息時 Nasdaq 跌得更多；降息或科技業繁榮時，Nasdaq 也漲得更快。'},
+      {title:'對台股的影響',text:'台股科技股（台積電、聯發科、廣達等）與 Nasdaq 走勢高度相關。Nasdaq 大漲，台灣半導體族群通常隔日跟漲。'},
+    ]
+  },
+  '^DJI':{
+    title:'道瓊工業平均指數',
+    intro:'道瓊工業指數（Dow Jones Industrial Average，DJIA）是由美國 30 家最具代表性的大型企業股價計算的指數，成立於 1896 年，是世界上歷史最悠久的股票指數。',
+    sections:[
+      {title:'成分股特色',text:'成分股包括 Apple、Microsoft、Boeing、Goldman Sachs、Johnson & Johnson 等傳統藍籌股，科技比重較 Nasdaq 低，金融、製造、醫療業比重較高。'},
+      {title:'局限性',text:'道瓊只有 30 支股票，以「股價加權」計算（股價高的公司影響力更大），代表性不如 S&P 500 全面，投資人常同時參考多個指數。'},
+    ]
+  },
+  '^TNX':{
+    title:'美國10年期公債殖利率',
+    intro:'美國10年期公債殖利率（10-Year Treasury Yield）是全球最重要的利率基準，代表投資人借錢給美國政府10年的「年化報酬率」。目前全球幾乎所有資產定價都以它作為參考基礎。',
+    sections:[
+      {title:'殖利率上升代表什麼？',text:'殖利率上升通常表示市場預期通膨走高、Fed 可能升息，或投資人擔憂財政赤字擴大。高殖利率會吸引資金從股市流向債市，對高本益比的科技股衝擊最大。'},
+      {title:'對股市的影響',text:'「利率是所有資產定價之母」。當10年期殖利率上升，股票的未來獲利折現值下降，尤其對 NVIDIA、Tesla 等高估值成長股壓力最大。'},
+      {title:'重要門檻',items:['< 3%：寬鬆環境，對股市有利','3%~4.5%：中性，市場可接受','> 5%：股市承壓，資金轉向債市']},
+    ]
+  },
+  '^VIX':{
+    title:'VIX 恐慌指數',
+    intro:'VIX（CBOE Volatility Index）是芝加哥期權交易所計算的「市場恐慌指數」，反映投資人對未來30天 S&P 500 波動幅度的預期，又稱「華爾街的恐慌溫度計」。',
+    sections:[
+      {title:'如何解讀？',text:'VIX 數值越高，代表市場越不安、預期波動越大。VIX 高峰通常出現在市場崩跌時（如 2008 年金融危機、2020 年 COVID 暴跌），而 VIX 低點則常出現在市場過度樂觀時。'},
+      {title:'重要門檻',items:['< 15：市場平靜，投資人樂觀','15~25：正常波動範圍','25~30：市場緊張，開始恐慌','> 30：高度恐慌，常見於危機','> 50：極端恐慌（2020年3月曾達80）']},
+      {title:'VIX與股市的關係',text:'VIX 與 S&P 500 通常呈「負相關」—— 股市大跌時 VIX 飆升，股市平穩上漲時 VIX 下降。部分投資人會在 VIX 極高時逆向買入股票。'},
+    ]
+  },
+  'DX-Y.NYB':{
+    title:'美元指數（DXY）',
+    intro:'美元指數（DXY）衡量美元相對於一籃子主要貨幣（歐元 57.6%、日圓 13.6%、英鎊 11.9%、加拿大幣 9.1% 等）的強弱，基準值為 100。',
+    sections:[
+      {title:'強勢美元的影響',text:'美元升值會壓抑美國出口型企業的海外收入（因折回美元後減少），對跨國公司如 Apple、Microsoft 造成負面影響。同時，強勢美元也讓以美元計價的大宗商品（石油、黃金）價格下跌。'},
+      {title:'對台股的影響',text:'美元強勢時，台幣通常貶值，對出口為主的台灣科技業帳面有利（海外美元收入換算台幣增加），但也可能引發外資撤離台股。'},
+      {title:'重要門檻',items:['DXY < 95：弱勢美元，新興市場資產受益','DXY 95~105：相對中性','DXY > 105：強勢美元，新興市場承壓']},
+    ]
+  },
+  'CL=F':{
+    title:'WTI 原油價格',
+    intro:'WTI（West Texas Intermediate）是美國原油的基準價格，也是全球最重要的能源定價基準之一。油價對通膨、企業成本、消費者支出均有深遠影響。',
+    sections:[
+      {title:'油價上漲對市場的影響',text:'油價上漲 → 通膨壓力增加 → Fed 可能維持高利率 → 股市承壓。同時航空、運輸、化學等高耗能產業成本增加，獲利受壓縮。'},
+      {title:'油價下跌的影響',text:'油價下跌 → 通膨降溫 → 有利於降息預期 → 股市受益。消費者可支配所得也因油費降低而增加。'},
+      {title:'影響油價的因素',items:['OPEC+ 減產/增產決策','美國頁岩油產量','中國需求（全球最大進口國）','地緣政治衝突（中東、俄羅斯）','美元強弱']},
+    ]
+  },
+  'GC=F':{
+    title:'黃金現貨價格',
+    intro:'黃金自古以來是最重要的避險資產，在市場不確定性高、通膨上升、或美元走弱時，資金通常流入黃金。各國央行也大量持有黃金作為外匯儲備。',
+    sections:[
+      {title:'金價上漲代表什麼？',text:'黃金通常在以下情況上漲：地緣政治風險升高（戰爭、衝突）、通膨預期上升、美元走弱、央行購金增加、股市大跌引發避險需求。'},
+      {title:'黃金 vs 股票',text:'黃金與股市通常呈負相關（股市大跌時黃金上漲），但並非絕對。2020年疫情爆發初期，黃金和股票一起跌（因流動性危機），隨後才反彈創新高。'},
+      {title:'2024-2025年走勢',text:'黃金在 2024-2025 年持續創新高，主因是各國央行去美元化購金、地緣政治風險（俄烏、中東）及美債信用疑慮，打破「升息時金價下跌」的傳統規律。'},
+    ]
+  },
+  'BTC-USD':{
+    title:'比特幣（Bitcoin）',
+    intro:'比特幣是全球最大的加密貨幣，市值佔整個加密貨幣市場約 50%。越來越多機構投資者和上市公司（如 MicroStrategy、Tesla）將比特幣納入資產配置。',
+    sections:[
+      {title:'比特幣與股市的關係',text:'比特幣被視為「風險資產」，在市場樂觀時隨科技股一起上漲，恐慌時一起下跌。VIX 飆升時，比特幣通常大跌。但長期而言，比特幣的波動幅度遠大於股市。'},
+      {title:'影響比特幣的關鍵因素',items:['Fed 貨幣政策（降息有利）','比特幣現貨 ETF 資金流向（BlackRock、Fidelity）','減半事件（每4年一次，供給減半）','監管政策（美國、歐盟）','大型機構買賣動向']},
+    ]
+  },
+  'EURUSD=X':{
+    title:'歐元兌美元（EUR/USD）',
+    intro:'EUR/USD 是全球交易量最大的外匯貨幣對，代表 1 歐元可以換多少美元。它反映歐洲與美國經濟的相對強弱，也受兩地央行（ECB vs Fed）的利率政策差異影響。',
+    sections:[
+      {title:'匯率上升（歐元走強）代表？',text:'代表市場認為歐洲經濟相對美國更強，或歐洲央行（ECB）利率高於美聯儲，或美元走弱。歐元走強時，在歐洲有大量業務的美國跨國公司海外收入折回美元後會減少。'},
+      {title:'對投資的影響',text:'EUR/USD 走高通常代表美元走弱，對新興市場（包含台灣）和大宗商品（金、油）有利，因為它們都以美元計價，美元貶值讓這些資產更便宜。'},
+    ]
+  },
+  'TWD=X':{
+    title:'美元兌台幣（USD/TWD）',
+    intro:'USD/TWD 顯示 1 美元可以換多少台幣。數字越大，代表台幣越弱（貶值）；數字越小，代表台幣越強（升值）。台幣匯率由中央銀行適度管理，與台灣出口競爭力和外資動向密切相關。',
+    sections:[
+      {title:'台幣升值的影響',text:'台幣升值（USD/TWD 下降）：外資流入台股、出口商美元收入換台幣減少（對台積電等出口公司不利）、進口成本降低（有利抑制通膨）。'},
+      {title:'台幣貶值的影響',text:'台幣貶值（USD/TWD 上升）：出口商競爭力提升、美元資產折算台幣增加（對持有美股的台灣投資人有利）、但可能引發外資撤離台股。'},
+      {title:'影響台幣的因素',items:['台灣出口表現（尤其是半導體）','外資買賣超台股金額','Fed 與央行利率差','地緣政治風險（台海局勢）','全球美元強弱']},
+    ]
+  },
+  '^FVX':{
+    title:'美國5年期公債殖利率',
+    intro:'美國5年期公債殖利率反映中期利率預期，比10年期更貼近 Fed 短期政策走向，是觀察市場對未來2~3年利率路徑預期的重要指標。',
+    sections:[
+      {title:'5年期 vs 10年期的差異',text:'5年期殖利率對 Fed 政策更敏感（市場預期 Fed 升息或降息，5年期反應更快）。10年期則更反映長期通膨預期和財政狀況。'},
+      {title:'殖利率曲線',text:'當5年期殖利率高於10年期（殖利率倒掛），歷史上常是經濟衰退的先行指標。2022-2023年美國殖利率曲線嚴重倒掛，引發市場對衰退的廣泛討論。'},
+    ]
+  },
+};
+
+// ── State ──
 let stockData = {};
+let sparkData = {};
 let currentTab = 'all';
 let refreshTimer = null;
 let countdown = 60;
+let macroLoaded = false;
 
+// ── Colors ──
 function getColor(pct) {
-  if (pct === null || pct === undefined) return '#1e2535';
+  if (pct == null) return '#1e2535';
   if (pct >= 5)  return '#00c853';
   if (pct >= 3)  return '#43a047';
   if (pct >= 1)  return '#2e7d32';
@@ -702,77 +571,129 @@ function getColor(pct) {
   if (pct >= -5) return '#c62828';
   return '#e53935';
 }
+function getTileSize(size){ return 62 + size * 13; }
+function fmt(n,d=2){ if(n==null||isNaN(n))return'-'; return n.toFixed(d); }
+function fmtPrice(n,isTW){ if(n==null||isNaN(n))return'-'; return isTW?`NT$${n.toFixed(2)}`:`$${n.toFixed(2)}`; }
 
-function getTileSize(size) {
-  const base = 60;
-  return base + size * 12;
-}
+// ── Yahoo Finance proxy ──
+const YF_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+const PROXIES = [
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
 
-function fmt(n, dec = 2) {
-  if (n === null || n === undefined || isNaN(n)) return '-';
-  return n.toFixed(dec);
-}
-
-function fmtPrice(n, isTW) {
-  if (n === null || isNaN(n)) return '-';
-  return isTW ? `NT$${n.toFixed(2)}` : `$${n.toFixed(2)}`;
-}
-
-// ── Yahoo Finance proxy (台股用) ──
-const YF_PROXY = 'https://query1.finance.yahoo.com/v8/finance/chart/';
-
-async function fetchTWQuote(symbol) {
-  // symbol e.g. "2330.TW"
-  const proxies = [
-    `https://corsproxy.io/?${encodeURIComponent(YF_PROXY + symbol + '?interval=1d&range=2d')}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(YF_PROXY + symbol + '?interval=1d&range=2d')}`,
-  ];
-  for (const url of proxies) {
+async function yFetch(symbol, params='?interval=1d&range=2d') {
+  const url = YF_BASE + symbol + params;
+  for (const build of PROXIES) {
     try {
-      const r = await fetch(url);
+      const r = await fetch(build(url), {signal: AbortSignal.timeout(8000)});
       if (!r.ok) continue;
       const d = await r.json();
-      const meta = d?.chart?.result?.[0]?.meta;
-      if (!meta || !meta.regularMarketPrice) continue;
-      const c  = meta.regularMarketPrice;
-      const pc = meta.chartPreviousClose || meta.previousClose || c;
-      const o  = meta.regularMarketOpen || c;
-      const h  = meta.regularMarketDayHigh || c;
-      const l  = meta.regularMarketDayLow  || c;
-      return { c, pc, o, h, l };
+      const res = d?.chart?.result?.[0];
+      if (res) return res;
     } catch { continue; }
   }
   return null;
 }
 
-// ── Finnhub (美股用) ──
+async function fetchTWQuote(symbol) {
+  const res = await yFetch(symbol);
+  if (!res) return null;
+  const meta = res.meta;
+  if (!meta?.regularMarketPrice) return null;
+  const c  = meta.regularMarketPrice;
+  const pc = meta.chartPreviousClose || meta.previousClose || c;
+  return { c, pc, o: meta.regularMarketOpen||c, h: meta.regularMarketDayHigh||c, l: meta.regularMarketDayLow||c };
+}
+
+async function fetchSparkline(symbol) {
+  // Get 5-day data for sparkline
+  const res = await yFetch(symbol, '?interval=1h&range=5d');
+  if (!res) return null;
+  const closes = res.indicators?.quote?.[0]?.close;
+  if (!closes) return null;
+  return closes.filter(v => v != null).slice(-30);
+}
+
+// ── Finnhub ──
 async function fetchUSQuote(symbol) {
   try {
     const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${API_KEY}`);
     const d = await r.json();
-    if (d && d.c && d.c !== 0) return d;
-    return null;
-  } catch { return null; }
+    if (d?.c && d.c !== 0) return d;
+  } catch {}
+  return null;
 }
 
+// ── Sparkline SVG ──
+function makeSpark(prices, isPos) {
+  if (!prices || prices.length < 2) return '<svg></svg>';
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const range = max - min || 1;
+  const w = 100, h = 20;
+  const pts = prices.map((p,i) => {
+    const x = (i / (prices.length-1)) * w;
+    const y = h - ((p - min) / range) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const color = isPos ? '#00c853' : '#e53935';
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  </svg>`;
+}
+
+function makePanelChart(prices, isPos) {
+  if (!prices || prices.length < 2) return '';
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const range = max - min || 1;
+  const w = 400, h = 70;
+  const pts = prices.map((p,i) => {
+    const x = (i / (prices.length-1)) * w;
+    const y = h - ((p - min) / range) * (h-4) - 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const ptsStr = pts.join(' ');
+  const first = pts[0], last = pts[pts.length-1];
+  const color = isPos ? '#00c853' : '#e53935';
+  const fillPts = `${first.split(',')[0]},${h} ` + ptsStr + ` ${last.split(',')[0]},${h}`;
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <polygon points="${fillPts}" fill="url(#sg)"/>
+    <polyline points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+// ── Logo ──
+function logoEl(domain, small=true) {
+  const size = small ? 16 : 40;
+  const cls  = small ? 'tile-logo' : 'panel-logo-big';
+  if (!domain) return '';
+  return `<img class="${cls}" src="https://logo.clearbit.com/${domain}" 
+    onerror="this.style.display='none'" 
+    width="${size}" height="${size}" loading="lazy">`;
+}
+
+// ── Fetch all ──
 async function fetchAll() {
   ['heatmap-tw','heatmap-tw-etf','heatmap-us'].forEach(id => {
-    document.getElementById(id).innerHTML =
-      `<div class="loading-overlay"><div class="spinner"></div>抓取資料中...</div>`;
+    document.getElementById(id).innerHTML = `<div class="loading-overlay"><div class="spinner"></div>抓取資料中...</div>`;
   });
 
-  // 台股：Yahoo Finance，可以並行
+  // TW stocks (Yahoo)
   const twAll = [...TW_STOCKS, ...TW_ETFS];
-  await Promise.all(twAll.map(async (s) => {
+  await Promise.all(twAll.map(async s => {
     const q = await fetchTWQuote(s.symbol);
     if (q) stockData[s.symbol] = q;
   }));
 
-  // 美股：Finnhub，分批避免超過 rate limit
+  // US stocks (Finnhub) in batches
   const BATCH = 10;
   for (let i = 0; i < US_STOCKS.length; i += BATCH) {
-    const batch = US_STOCKS.slice(i, i + BATCH);
-    await Promise.all(batch.map(async (s) => {
+    await Promise.all(US_STOCKS.slice(i, i+BATCH).map(async s => {
       const q = await fetchUSQuote(s.symbol);
       if (q) stockData[s.symbol] = q;
     }));
@@ -783,363 +704,357 @@ async function fetchAll() {
   updateStats();
   updateTimestamp();
   startCountdown();
+  // Fetch sparklines in background
+  fetchSparklines();
 }
 
+async function fetchSparklines() {
+  const all = [...TW_STOCKS, ...TW_ETFS, ...US_STOCKS];
+  await Promise.all(all.map(async s => {
+    const data = await fetchSparkline(s.symbol);
+    if (data) {
+      sparkData[s.symbol] = data;
+      // Update tile sparkline
+      const el = document.getElementById(`spark-${s.symbol.replace(/[^a-zA-Z0-9]/g,'_')}`);
+      if (el) {
+        const q = stockData[s.symbol];
+        const pct = q ? (q.c - q.pc) / q.pc * 100 : 0;
+        el.innerHTML = makeSpark(data, pct >= 0);
+      }
+    }
+  }));
+}
+
+// ── Render ──
 function renderTile(stock, isTW) {
   const q = stockData[stock.symbol];
-  const pct = q ? ((q.c - q.pc) / q.pc * 100) : null;
-  const change = q ? (q.c - q.pc) : null;
+  const pct = q ? (q.c - q.pc) / q.pc * 100 : null;
   const size = getTileSize(stock.size);
   const color = getColor(pct);
-  const pctStr = pct !== null ? `${pct >= 0 ? '+' : ''}${fmt(pct)}%` : '---';
+  const pctStr = pct != null ? `${pct>=0?'+':''}${fmt(pct)}%` : '---';
   const priceStr = q ? fmtPrice(q.c, isTW) : '-';
-  const shortSymbol = stock.symbol.replace('.TW','');
+  const shortSym = stock.symbol.replace('.TW','');
+  const sparkId = `spark-${stock.symbol.replace(/[^a-zA-Z0-9]/g,'_')}`;
+  const spark = sparkData[stock.symbol] ? makeSpark(sparkData[stock.symbol], pct>=0) : '';
 
-  return `
-    <div class="stock-tile"
-      style="background:${color}; width:${size}px; height:${size}px; flex:0 0 ${size}px"
-      onmouseenter="showTooltip(event, '${stock.symbol}', '${stock.name}', ${isTW})"
-      onmouseleave="hideTooltip()"
-      onmousemove="moveTooltip(event)"
-    >
-      ${stock.etf ? '<div class="etf-badge">ETF</div>' : ''}
-      <div>
-        <div class="tile-symbol">${shortSymbol}</div>
-        <div class="tile-name">${stock.name}</div>
-      </div>
-      <div>
-        <div class="tile-change">${pctStr}</div>
-        <div class="tile-price">${priceStr}</div>
-      </div>
+  return `<div class="stock-tile" 
+    style="background:${color};width:${size}px;height:${size+20}px;flex:0 0 ${size}px"
+    onclick="openPanel('${stock.symbol}','${stock.name}',${isTW})"
+    onmouseenter="showTT(event,'${stock.symbol}','${stock.name}',${isTW})"
+    onmouseleave="hideTT()" onmousemove="moveTT(event)">
+    ${stock.etf?'<div class="etf-badge">ETF</div>':''}
+    <div class="tile-top">
+      ${logoEl(stock.domain, true)}
+      <div class="tile-symbol">${shortSym}</div>
     </div>
-  `;
+    <div class="tile-name">${stock.name}</div>
+    <div class="tile-spark" id="${sparkId}">${spark}</div>
+    <div class="tile-bottom">
+      <div class="tile-change">${pctStr}</div>
+      <div class="tile-price">${priceStr}</div>
+    </div>
+  </div>`;
 }
 
 function renderAll() {
-  document.getElementById('heatmap-tw').innerHTML =
-    TW_STOCKS.map(s => renderTile(s, true)).join('');
-  document.getElementById('heatmap-tw-etf').innerHTML =
-    TW_ETFS.map(s => renderTile(s, true)).join('');
-  document.getElementById('heatmap-us').innerHTML =
-    US_STOCKS.map(s => renderTile(s, false)).join('');
+  document.getElementById('heatmap-tw').innerHTML = TW_STOCKS.map(s=>renderTile(s,true)).join('');
+  document.getElementById('heatmap-tw-etf').innerHTML = TW_ETFS.map(s=>renderTile(s,true)).join('');
+  document.getElementById('heatmap-us').innerHTML = US_STOCKS.map(s=>renderTile(s,false)).join('');
 }
 
 function updateStats() {
-  const all = [...TW_STOCKS, ...TW_ETFS, ...US_STOCKS];
-  let up = 0, down = 0, flat = 0;
-  all.forEach(s => {
-    const q = stockData[s.symbol];
-    if (!q) return;
-    const pct = (q.c - q.pc) / q.pc * 100;
-    if (pct > 0.1) up++;
-    else if (pct < -0.1) down++;
-    else flat++;
+  const all = [...TW_STOCKS,...TW_ETFS,...US_STOCKS];
+  let up=0,dn=0,fl=0;
+  all.forEach(s=>{
+    const q=stockData[s.symbol]; if(!q)return;
+    const p=(q.c-q.pc)/q.pc*100;
+    if(p>0.1)up++; else if(p<-0.1)dn++; else fl++;
   });
-  document.getElementById('stat-up').textContent = up;
-  document.getElementById('stat-down').textContent = down;
-  document.getElementById('stat-flat').textContent = flat;
+  document.getElementById('stat-up').textContent=up;
+  document.getElementById('stat-down').textContent=dn;
+  document.getElementById('stat-flat').textContent=fl;
 }
 
 function updateTimestamp() {
-  const now = new Date();
   document.getElementById('last-updated').textContent =
-    `更新於 ${now.toLocaleTimeString('zh-TW')}`;
+    `更新於 ${new Date().toLocaleTimeString('zh-TW')}`;
 }
 
 function startCountdown() {
-  if (refreshTimer) clearInterval(refreshTimer);
-  countdown = 60;
-  refreshTimer = setInterval(() => {
+  if(refreshTimer) clearInterval(refreshTimer);
+  countdown=60;
+  refreshTimer=setInterval(()=>{
     countdown--;
-    document.getElementById('refresh-info').textContent = `${countdown}s 後更新`;
-    if (countdown <= 0) {
-      clearInterval(refreshTimer);
-      fetchAll();
-    }
-  }, 1000);
+    document.getElementById('refresh-info').textContent=`${countdown}s 後更新`;
+    if(countdown<=0){clearInterval(refreshTimer);fetchAll();}
+  },1000);
 }
 
-// Tooltip
-const tooltip = document.getElementById('tooltip');
-
-function showTooltip(e, symbol, name, isTW) {
-  const q = stockData[symbol];
-  document.getElementById('tt-symbol').textContent = symbol.replace('.TW','');
-  document.getElementById('tt-name').textContent = name;
-  if (q) {
-    const pct = (q.c - q.pc) / q.pc * 100;
-    const change = q.c - q.pc;
-    const isPos = pct >= 0;
-    document.getElementById('tt-price').textContent = fmtPrice(q.c, isTW);
-    document.getElementById('tt-price').className = 'tt-val';
-    const chEl = document.getElementById('tt-change');
-    chEl.textContent = `${change >= 0 ? '+' : ''}${fmt(change)}`;
-    chEl.className = `tt-val ${isPos ? 'pos' : 'neg'}`;
-    const pctEl = document.getElementById('tt-pct');
-    pctEl.textContent = `${pct >= 0 ? '+' : ''}${fmt(pct)}%`;
-    pctEl.className = `tt-val ${isPos ? 'pos' : 'neg'}`;
-    document.getElementById('tt-open').textContent = fmtPrice(q.o, isTW);
-    document.getElementById('tt-high').textContent = fmtPrice(q.h, isTW);
-    document.getElementById('tt-low').textContent = fmtPrice(q.l, isTW);
+// ── Tooltip ──
+const tt = document.getElementById('tooltip');
+function showTT(e,sym,name,isTW){
+  const q=stockData[sym];
+  document.getElementById('tt-symbol').textContent=sym.replace('.TW','');
+  document.getElementById('tt-name').textContent=name;
+  if(q){
+    const pct=(q.c-q.pc)/q.pc*100, pos=pct>=0;
+    document.getElementById('tt-price').textContent=fmtPrice(q.c,isTW);
+    const pe=document.getElementById('tt-pct');
+    pe.textContent=`${pos?'+':''}${fmt(pct)}%`; pe.className=`tt-val ${pos?'pos':'neg'}`;
+    document.getElementById('tt-high').textContent=fmtPrice(q.h,isTW);
+    document.getElementById('tt-low').textContent=fmtPrice(q.l,isTW);
   } else {
-    ['tt-price','tt-change','tt-pct','tt-open','tt-high','tt-low']
-      .forEach(id => { document.getElementById(id).textContent = '-'; });
+    ['tt-price','tt-pct','tt-high','tt-low'].forEach(id=>document.getElementById(id).textContent='-');
   }
-  tooltip.classList.add('visible');
-  moveTooltip(e);
+  tt.classList.add('visible'); moveTT(e);
+}
+function hideTT(){tt.classList.remove('visible');}
+function moveTT(e){
+  const x=e.clientX+16,y=e.clientY-10;
+  const tw=tt.offsetWidth||200,th=tt.offsetHeight||160;
+  tt.style.left=(x+tw>window.innerWidth?x-tw-32:x)+'px';
+  tt.style.top=(y+th>window.innerHeight?y-th:y)+'px';
 }
 
-function hideTooltip() { tooltip.classList.remove('visible'); }
+// ── Stock detail panel ──
+function openPanel(sym, name, isTW) {
+  hideTT();
+  const q = stockData[sym];
+  const pct = q ? (q.c-q.pc)/q.pc*100 : null;
+  const isPos = pct >= 0;
+  const info = COMPANY_INFO[sym];
+  const stock = [...TW_STOCKS,...TW_ETFS,...US_STOCKS].find(s=>s.symbol===sym);
 
-function moveTooltip(e) {
-  const x = e.clientX + 16;
-  const y = e.clientY - 10;
-  const tw = tooltip.offsetWidth || 200;
-  const th = tooltip.offsetHeight || 180;
-  tooltip.style.left = (x + tw > window.innerWidth ? x - tw - 32 : x) + 'px';
-  tooltip.style.top = (y + th > window.innerHeight ? y - th : y) + 'px';
+  // Header
+  document.getElementById('panel-symbol').textContent = sym.replace('.TW','');
+  document.getElementById('panel-name').textContent = name;
+  const logoWrap = document.getElementById('panel-logo-wrap');
+  if (stock?.domain) {
+    logoWrap.innerHTML = `<img class="panel-logo-big" src="https://logo.clearbit.com/${stock.domain}" 
+      onerror="this.outerHTML='<div class=panel-logo-placeholder>${name.slice(0,1)}</div>'"
+      width="40" height="40">`;
+  } else {
+    logoWrap.innerHTML = `<div class="panel-logo-placeholder">${name.slice(0,1)}</div>`;
+  }
+
+  // Price
+  document.getElementById('panel-price').textContent = q ? fmtPrice(q.c, isTW) : '-';
+  const chEl = document.getElementById('panel-change');
+  if (q) {
+    chEl.textContent = `${isPos?'+':''}${fmt(pct)}%`;
+    chEl.className = `panel-change ${isPos?'pos':'neg'}`;
+  } else { chEl.textContent = ''; }
+
+  // Chart
+  const spark = sparkData[sym];
+  document.getElementById('panel-chart').innerHTML = spark ? makePanelChart(spark, isPos) : '';
+
+  // Stats
+  document.getElementById('panel-stats').innerHTML = q ? `
+    <div class="panel-stat"><div class="panel-stat-label">開盤</div><div class="panel-stat-value">${fmtPrice(q.o,isTW)}</div></div>
+    <div class="panel-stat"><div class="panel-stat-label">最高</div><div class="panel-stat-value" style="color:var(--gain5)">${fmtPrice(q.h,isTW)}</div></div>
+    <div class="panel-stat"><div class="panel-stat-label">最低</div><div class="panel-stat-value" style="color:var(--loss5)">${fmtPrice(q.l,isTW)}</div></div>
+    <div class="panel-stat"><div class="panel-stat-label">昨收</div><div class="panel-stat-value">${fmtPrice(q.pc,isTW)}</div></div>
+  ` : '';
+
+  // Description
+  document.getElementById('panel-desc').textContent = info?.desc || '暫無公司資料。';
+  document.getElementById('panel-tags').innerHTML = (info?.tags||[]).map(t=>`<span class="panel-tag">${t}</span>`).join('');
+
+  document.getElementById('detail-panel').classList.add('open');
+  document.getElementById('panel-overlay').classList.add('visible');
 }
 
-// Tab switching
+function closePanel() {
+  document.getElementById('detail-panel').classList.remove('open');
+  document.getElementById('panel-overlay').classList.remove('visible');
+}
+
+// ── Macro panel ──
+function openMacroPanel(symbol) {
+  const ex = MACRO_EXPLAIN[symbol];
+  const m = MACRO_SYMBOLS.find(m=>m.symbol===symbol);
+  if (!ex || !m) return;
+
+  document.getElementById('mpanel-icon').textContent = m.icon;
+  document.getElementById('mpanel-title').textContent = ex.title;
+  document.getElementById('mpanel-subtitle').textContent = m.desc;
+
+  let html = `<div class="macro-explain-block">
+    <div class="macro-explain-title">📖 什麼是 ${m.label}？</div>
+    <div class="macro-explain-text">${ex.intro}</div>
+  </div>`;
+
+  ex.sections.forEach(s => {
+    html += `<div class="macro-explain-block">
+      <div class="macro-explain-title">${s.title}</div>`;
+    if (s.text) html += `<div class="macro-explain-text">${s.text}</div>`;
+    if (s.items) html += `<ul class="macro-impact-list">${s.items.map(i=>`<li>${i}</li>`).join('')}</ul>`;
+    html += '</div>';
+  });
+
+  document.getElementById('mpanel-body').innerHTML = html;
+  document.getElementById('macro-panel').classList.add('open');
+  document.getElementById('panel-overlay').classList.add('visible');
+}
+
+function closeMacroPanel() {
+  document.getElementById('macro-panel').classList.remove('open');
+  document.getElementById('panel-overlay').classList.remove('visible');
+}
+
+// ── Tab switching ──
 function switchTab(tab, el) {
   currentTab = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-
-  document.getElementById('section-tw').style.display =
-    (tab === 'all' || tab === 'tw') ? '' : 'none';
-  document.getElementById('section-tw-etf').style.display =
-    (tab === 'all' || tab === 'tw' || tab === 'etf') ? '' : 'none';
-  document.getElementById('section-us').style.display =
-    (tab === 'all' || tab === 'us') ? '' : 'none';
-  document.getElementById('section-macro').style.display =
-    tab === 'macro' ? '' : 'none';
-
-  if (tab === 'macro' && !macroLoaded) loadMacro();
+  document.getElementById('section-tw').style.display      = (tab==='all'||tab==='tw') ? '':'none';
+  document.getElementById('section-tw-etf').style.display  = (tab==='all'||tab==='tw'||tab==='etf') ? '':'none';
+  document.getElementById('section-us').style.display      = (tab==='all'||tab==='us') ? '':'none';
+  document.getElementById('section-macro').style.display   = tab==='macro' ? '':'none';
+  if (tab==='macro' && !macroLoaded) loadMacro();
 }
 
-// ── 總經指標 (C) ──
-let macroLoaded = false;
-
-const MACRO_SYMBOLS = [
-  { symbol: '^TNX',  label: '美債10年期', desc: '殖利率上升 → 股市壓力', unit: '%' },
-  { symbol: 'DX-Y.NYB', label: '美元指數 DXY', desc: '強勢美元 → 壓抑出口股', unit: '' },
-  { symbol: '^VIX',  label: 'VIX 恐慌指數', desc: '>30 市場恐慌', unit: '' },
-  { symbol: 'CL=F',  label: '原油 WTI', desc: '油價漲 → 通膨壓力', unit: '$' },
-  { symbol: 'GC=F',  label: '黃金', desc: '避險需求指標', unit: '$' },
-  { symbol: '^GSPC', label: 'S&P 500', desc: '美股大盤', unit: '' },
-  { symbol: '^IXIC', label: 'Nasdaq', desc: '科技股指數', unit: '' },
-  { symbol: '^DJI',  label: '道瓊工業', desc: '藍籌股指數', unit: '' },
-  { symbol: 'BTC-USD', label: 'Bitcoin', desc: '風險情緒指標', unit: '$' },
-  { symbol: 'EURUSD=X', label: 'EUR/USD', desc: '歐元匯率', unit: '' },
-  { symbol: 'TWD=X', label: 'USD/TWD', desc: '台幣匯率', unit: '' },
-  { symbol: '^FVX',  label: '美債5年期', desc: '中期利率走勢', unit: '%' },
-];
-
+// ── Macro ──
 async function loadMacro() {
   macroLoaded = true;
   const grid = document.getElementById('macro-grid');
-
-  const results = await Promise.all(MACRO_SYMBOLS.map(async (m) => {
-    const q = await fetchTWQuote(m.symbol); // reuse Yahoo proxy
-    return { ...m, q };
+  const results = await Promise.all(MACRO_SYMBOLS.map(async m => {
+    const q = await fetchTWQuote(m.symbol);
+    return {...m, q};
   }));
 
   grid.innerHTML = results.map(m => {
-    const q = m.q;
-    const val = q ? q.c : null;
-    const pct = q ? ((q.c - q.pc) / q.pc * 100) : null;
-    const isPos = pct > 0;
-    const cls = pct === null ? 'neu' : (pct > 0 ? 'pos' : 'neg');
-    const pctStr = pct !== null ? `${isPos ? '+' : ''}${pct.toFixed(2)}%` : '-';
-    const valStr = val !== null
-      ? (m.unit === '$' ? `$${val.toLocaleString('en', {maximumFractionDigits: 2})}`
-        : m.unit === '%' ? `${val.toFixed(2)}%`
-        : val.toFixed(2))
-      : '-';
-
-    return `<div class="macro-card">
-      <div class="macro-label">${m.label}</div>
+    const q=m.q, val=q?q.c:null, pct=q?(q.c-q.pc)/q.pc*100:null;
+    const cls=pct==null?'neu':(pct>0?'pos':'neg');
+    const pctStr=pct!=null?`${pct>0?'+':''}${pct.toFixed(2)}%`:'-';
+    const valStr=val!=null?(m.unit==='$'?`$${val.toLocaleString('en',{maximumFractionDigits:2})}`
+      :m.unit==='%'?`${val.toFixed(2)}%`:val.toFixed(2)):'-';
+    const hasExplain = !!MACRO_EXPLAIN[m.symbol];
+    return `<div class="macro-card" onclick="${hasExplain?`openMacroPanel('${m.symbol}')`:''}" 
+      style="${hasExplain?'':'cursor:default'}">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:18px">${m.icon}</span>
+        <div class="macro-label">${m.label}</div>
+      </div>
       <div class="macro-value">${valStr}</div>
       <div class="macro-change ${cls}">${pctStr}</div>
       <div class="macro-desc">${m.desc}</div>
+      ${hasExplain?'<div class="macro-hint">👆 點擊查看說明</div>':''}
     </div>`;
   }).join('');
 
   loadNews();
 }
 
-// ── 財經新聞 RSS (B) ──
+// ── News ──
 const RSS_FEEDS = [
-  {
-    url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC,^IXIC,NVDA,TSLA,AAPL&region=US&lang=en-US',
-    source: 'Yahoo Finance', badge: 'badge-yahoo', limit: 12
-  },
-  {
-    url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines',
-    source: 'MarketWatch', badge: 'badge-mw', limit: 10
-  },
-  {
-    url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',
-    source: 'MarketWatch', badge: 'badge-mw', limit: 8
-  },
-  {
-    url: 'https://www.investing.com/rss/news.rss',
-    source: 'Investing.com', badge: 'badge-investing', limit: 8
-  },
-  {
-    url: 'https://www.federalreserve.gov/feeds/press_all.xml',
-    source: 'Fed 官方', badge: 'badge-fed', limit: 5
-  },
+  {url:'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC,^IXIC,NVDA,TSLA,AAPL&region=US&lang=en-US',source:'Yahoo Finance',badge:'badge-yahoo',limit:12},
+  {url:'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines',source:'MarketWatch',badge:'badge-mw',limit:10},
+  {url:'https://feeds.content.dowjones.io/public/rss/mw_topstories',source:'MarketWatch',badge:'badge-mw',limit:8},
+  {url:'https://www.federalreserve.gov/feeds/press_all.xml',source:'Fed 官方',badge:'badge-fed',limit:5},
 ];
 
-// 多個 CORS proxy，依序嘗試
-const PROXIES = [
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+const IMPACT_RULES = [
+  {score:10,cls:'impact-urgent',label:'🔴 緊急',keywords:['breaking','emergency','attack','missile','nuclear','explosion','assassination','coup','default','collapse','crash','halt trading']},
+  {score:9,cls:'impact-fed',label:'🏦 Fed',keywords:['federal reserve','fed rate','interest rate decision','fomc','powell','rate hike','rate cut','basis points','monetary policy','cpi','pce','inflation','jackson hole']},
+  {score:8,cls:'impact-geo',label:'⚔️ 地緣政治',keywords:['iran','israel','ukraine','russia','china taiwan','south china sea','north korea','war','ceasefire','airstrike','sanction','embargo','military strike','troops','nato','conflict','middle east','gulf']},
+  {score:7,cls:'impact-trade',label:'🚢 貿易',keywords:['tariff','trade war','export ban','import restriction','supply chain','semiconductor ban','chip restriction','huawei','trade deal']},
+  {score:6,cls:'impact-macro',label:'📊 總經',keywords:['gdp','recession','unemployment','jobs report','nonfarm','payroll','retail sales','pmi','consumer confidence','housing','debt ceiling','budget','fiscal','treasury']},
+  {score:5,cls:'impact-earnings',label:'💹 財報',keywords:['earnings','revenue','profit','quarterly','guidance','outlook','beat','miss','ipo','acquisition','merger','layoff','buyback']},
+  {score:1,cls:'impact-low',label:'一般',keywords:[]},
 ];
 
-async function fetchRSS(feedUrl) {
-  for (const buildProxy of PROXIES) {
-    try {
-      const r = await fetch(buildProxy(feedUrl), { signal: AbortSignal.timeout(8000) });
-      if (!r.ok) continue;
-      const text = await r.text();
-      if (!text || text.length < 100) continue;
-      return text;
-    } catch { continue; }
+function getImpact(text){
+  const t=text.toLowerCase();
+  for(const rule of IMPACT_RULES){
+    if(rule.keywords.length===0) return rule;
+    if(rule.keywords.some(k=>t.includes(k))) return rule;
+  }
+  return IMPACT_RULES[IMPACT_RULES.length-1];
+}
+
+async function fetchRSS(url){
+  for(const build of PROXIES){
+    try{
+      const r=await fetch(build(url),{signal:AbortSignal.timeout(8000)});
+      if(!r.ok) continue;
+      const t=await r.text();
+      if(t&&t.length>100) return t;
+    }catch{continue;}
   }
   return null;
 }
 
-// 重大事件關鍵字分類
-const IMPACT_RULES = [
-  {
-    score: 10, cls: 'impact-urgent', label: '🔴 緊急',
-    keywords: ['breaking','emergency','attack','missile','nuclear','explosion','assassination','coup','default','collapse','crash','halt trading','war breaks']
-  },
-  {
-    score: 9, cls: 'impact-fed', label: '🏦 Fed',
-    keywords: ['federal reserve','fed rate','interest rate decision','fomc','powell','rate hike','rate cut','basis points','monetary policy','cpi','pce','inflation','jackson hole']
-  },
-  {
-    score: 8, cls: 'impact-geo', label: '⚔️ 地緣政治',
-    keywords: ['iran','israel','ukraine','russia','china taiwan','south china sea','north korea','war','ceasefire','airstrike','sanction','embargo','military strike','troops','nato','conflict','middle east','gulf']
-  },
-  {
-    score: 7, cls: 'impact-trade', label: '🚢 貿易',
-    keywords: ['tariff','trade war','export ban','import restriction','supply chain','semiconductor ban','chip restriction','huawei','trade deal','wto','customs']
-  },
-  {
-    score: 6, cls: 'impact-macro', label: '📊 總經',
-    keywords: ['gdp','recession','unemployment','jobs report','nonfarm','payroll','retail sales','pmi','consumer confidence','housing','debt ceiling','budget','fiscal','treasury']
-  },
-  {
-    score: 5, cls: 'impact-earnings', label: '💹 財報',
-    keywords: ['earnings','revenue','profit','quarterly','guidance','outlook','beat','miss','ipo','acquisition','merger','layoff','buyback']
-  },
-  {
-    score: 1, cls: 'impact-low', label: '一般',
-    keywords: []
-  },
-];
-
-function getImpact(text) {
-  const t = text.toLowerCase();
-  for (const rule of IMPACT_RULES) {
-    if (rule.keywords.length === 0) return rule;
-    if (rule.keywords.some(k => t.includes(k))) return rule;
-  }
-  return IMPACT_RULES[IMPACT_RULES.length - 1];
-}
-
-async function loadNews() {
-  const newsEl = document.getElementById('news-list');
-  newsEl.innerHTML = `<div class="loading-overlay"><div class="spinner"></div>載入新聞中...</div>`;
-
-  const allItems = [];
-
-  await Promise.all(RSS_FEEDS.map(async (feed) => {
-    const text = await fetchRSS(feed.url);
-    if (!text) return;
-    try {
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, 'text/xml');
-      const items = [...xml.querySelectorAll('item')].slice(0, feed.limit);
-      items.forEach(item => {
-        const title   = item.querySelector('title')?.textContent?.trim() || '';
-        const link    = item.querySelector('link')?.textContent?.trim() || '#';
-        const desc    = (item.querySelector('description')?.textContent || '')
-                          .replace(/<[^>]+>/g, '').replace(/&nbsp;/g,' ').trim().slice(0, 130);
-        const pubDate = item.querySelector('pubDate')?.textContent || '';
-        const dateObj = pubDate ? new Date(pubDate) : new Date(0);
-        const dateStr = pubDate ? dateObj.toLocaleString('zh-TW', {
-          month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
-        }) : '';
-        if (!title || title.length < 5) return;
-        const impact = getImpact(title + ' ' + desc);
-        allItems.push({ title, link, desc, date: dateStr, dateObj, source: feed.source, badge: feed.badge, impact });
+async function loadNews(){
+  const newsEl=document.getElementById('news-list');
+  newsEl.innerHTML=`<div class="loading-overlay"><div class="spinner"></div>載入新聞中...</div>`;
+  const all=[];
+  await Promise.all(RSS_FEEDS.map(async feed=>{
+    const text=await fetchRSS(feed.url); if(!text)return;
+    try{
+      const xml=new DOMParser().parseFromString(text,'text/xml');
+      [...xml.querySelectorAll('item')].slice(0,feed.limit).forEach(item=>{
+        const title=(item.querySelector('title')?.textContent||'').trim();
+        const link=(item.querySelector('link')?.textContent||'#').trim();
+        const desc=(item.querySelector('description')?.textContent||'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim().slice(0,130);
+        const pubDate=item.querySelector('pubDate')?.textContent||'';
+        const dateObj=pubDate?new Date(pubDate):new Date(0);
+        const dateStr=pubDate?dateObj.toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+        if(!title||title.length<5)return;
+        all.push({title,link,desc,date:dateStr,dateObj,source:feed.source,badge:feed.badge,impact:getImpact(title+' '+desc)});
       });
-    } catch { /* parse error, skip */ }
+    }catch{}
   }));
 
-  if (allItems.length === 0) {
-    newsEl.innerHTML = `
-      <div style="padding:32px;text-align:center;color:var(--muted)">
-        <div style="font-size:32px;margin-bottom:12px">📡</div>
-        <div style="font-size:14px;margin-bottom:6px">新聞載入失敗</div>
-        <div style="font-size:12px">可能是網路或 proxy 問題，請稍後再試</div>
-        <button onclick="macroLoaded=false;loadMacro()" style="margin-top:16px;padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">重新載入</button>
-      </div>`;
-    return;
+  if(all.length===0){
+    newsEl.innerHTML=`<div style="padding:32px;text-align:center;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:12px">📡</div>
+      <div style="font-size:14px;margin-bottom:6px">新聞載入失敗</div>
+      <div style="font-size:12px">proxy 不穩定，請稍後再試</div>
+      <button onclick="macroLoaded=false;loadMacro()" style="margin-top:16px;padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">重新載入</button>
+    </div>`; return;
   }
 
-  // 去重
-  const seen = new Set();
-  const unique = allItems.filter(item => {
-    const key = item.title.slice(0, 50).toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key); return true;
-  });
+  const seen=new Set();
+  const unique=all.filter(i=>{const k=i.title.slice(0,50).toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+  unique.sort((a,b)=>b.impact.score-a.impact.score||b.dateObj-a.dateObj);
 
-  // 排序：影響分數高 → 時間新
-  unique.sort((a, b) => b.impact.score - a.impact.score || b.dateObj - a.dateObj);
+  const breaking=unique.filter(i=>i.impact.score>=8);
+  const normal=unique.filter(i=>i.impact.score<8);
 
-  const breaking = unique.filter(i => i.impact.score >= 8);
-  const normal   = unique.filter(i => i.impact.score < 8);
-
-  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:12px">共 ${unique.length} 則新聞 · 來自 ${RSS_FEEDS.length} 個來源</div>`;
-
-  if (breaking.length > 0) {
-    html += `<div class="news-section-label">⚡ 重大事件 · 置頂</div>`;
-    html += breaking.map(item => renderNewsItem(item, true)).join('');
-    html += `<div class="news-section-label" style="margin-top:20px">📰 最新財經新聞</div>`;
+  let html=`<div style="font-size:11px;color:var(--muted);margin-bottom:12px">共 ${unique.length} 則新聞</div>`;
+  if(breaking.length>0){
+    html+=`<div class="news-section-label">⚡ 重大事件 · 置頂</div>`;
+    html+=breaking.map(i=>newsItem(i,true)).join('');
+    html+=`<div class="news-section-label" style="margin-top:20px">📰 最新財經新聞</div>`;
   } else {
-    html += `<div class="news-section-label">📰 最新財經新聞</div>`;
+    html+=`<div class="news-section-label">📰 最新財經新聞</div>`;
   }
-
-  html += normal.map(item => renderNewsItem(item, false)).join('');
-  newsEl.innerHTML = html;
+  html+=normal.map(i=>newsItem(i,false)).join('');
+  newsEl.innerHTML=html;
 }
 
-function renderNewsItem(item, isBreaking) {
-  return `
-    <a class="news-item ${isBreaking ? 'news-breaking' : ''}" href="${item.link}" target="_blank" rel="noopener">
-      <div class="news-left">
-        <span class="news-source-badge ${item.badge}">${item.source}</span>
-        <span class="news-impact ${item.impact.cls}">${item.impact.label}</span>
-      </div>
-      <div class="news-content">
-        <div class="news-title">${item.title}</div>
-        ${item.desc ? `<div class="news-desc">${item.desc}…</div>` : ''}
-        <div class="news-meta">${item.date}</div>
-      </div>
-    </a>
-  `;
+function newsItem(item,isBreaking){
+  return `<a class="news-item ${isBreaking?'news-breaking':''}" href="${item.link}" target="_blank" rel="noopener">
+    <div class="news-left">
+      <span class="news-source-badge ${item.badge}">${item.source}</span>
+      <span class="news-impact ${item.impact.cls}">${item.impact.label}</span>
+    </div>
+    <div class="news-content">
+      <div class="news-title">${item.title}</div>
+      ${item.desc?`<div class="news-desc">${item.desc}…</div>`:''}
+      <div class="news-meta">${item.date}</div>
+    </div>
+  </a>`;
 }
 
-// Init
+// ── ESC to close panels ──
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape'){ closePanel(); closeMacroPanel(); }
+});
+
+// ── Init ──
 fetchAll();
 </script>
 </body>
