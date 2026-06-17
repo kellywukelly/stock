@@ -372,8 +372,12 @@
     <span class="stat-val" id="stat-flat" style="color:var(--muted)">-</span>
   </div>
   <div class="stat-item" style="margin-left:auto">
-    <span class="stat-label">資料來源</span>
-    <span class="stat-val" style="color:var(--accent)">Finnhub</span>
+    <span class="stat-label">🇹🇼 台股</span>
+    <span class="stat-val" style="color:var(--muted)">Yahoo（延遲15分）</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">🇺🇸 美股</span>
+    <span class="stat-val" style="color:var(--accent)">Finnhub（即時）</span>
   </div>
 </div>
 
@@ -518,7 +522,35 @@ function fmtPrice(n, isTW) {
   return isTW ? `NT$${n.toFixed(2)}` : `$${n.toFixed(2)}`;
 }
 
-async function fetchQuote(symbol) {
+// ── Yahoo Finance proxy (台股用) ──
+const YF_PROXY = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+
+async function fetchTWQuote(symbol) {
+  // symbol e.g. "2330.TW"
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(YF_PROXY + symbol + '?interval=1d&range=2d')}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(YF_PROXY + symbol + '?interval=1d&range=2d')}`,
+  ];
+  for (const url of proxies) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const d = await r.json();
+      const meta = d?.chart?.result?.[0]?.meta;
+      if (!meta || !meta.regularMarketPrice) continue;
+      const c  = meta.regularMarketPrice;
+      const pc = meta.chartPreviousClose || meta.previousClose || c;
+      const o  = meta.regularMarketOpen || c;
+      const h  = meta.regularMarketDayHigh || c;
+      const l  = meta.regularMarketDayLow  || c;
+      return { c, pc, o, h, l };
+    } catch { continue; }
+  }
+  return null;
+}
+
+// ── Finnhub (美股用) ──
+async function fetchUSQuote(symbol) {
   try {
     const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${API_KEY}`);
     const d = await r.json();
@@ -528,22 +560,27 @@ async function fetchQuote(symbol) {
 }
 
 async function fetchAll() {
-  const allStocks = [...TW_STOCKS, ...TW_ETFS, ...US_STOCKS];
-
-  // Show loading
   ['heatmap-tw','heatmap-tw-etf','heatmap-us'].forEach(id => {
-    document.getElementById(id).innerHTML = `<div class="loading-overlay"><div class="spinner"></div>抓取資料中...</div>`;
+    document.getElementById(id).innerHTML =
+      `<div class="loading-overlay"><div class="spinner"></div>抓取資料中...</div>`;
   });
 
-  // Fetch in batches to respect rate limit
+  // 台股：Yahoo Finance，可以並行
+  const twAll = [...TW_STOCKS, ...TW_ETFS];
+  await Promise.all(twAll.map(async (s) => {
+    const q = await fetchTWQuote(s.symbol);
+    if (q) stockData[s.symbol] = q;
+  }));
+
+  // 美股：Finnhub，分批避免超過 rate limit
   const BATCH = 10;
-  for (let i = 0; i < allStocks.length; i += BATCH) {
-    const batch = allStocks.slice(i, i + BATCH);
+  for (let i = 0; i < US_STOCKS.length; i += BATCH) {
+    const batch = US_STOCKS.slice(i, i + BATCH);
     await Promise.all(batch.map(async (s) => {
-      const q = await fetchQuote(s.symbol);
+      const q = await fetchUSQuote(s.symbol);
       if (q) stockData[s.symbol] = q;
     }));
-    if (i + BATCH < allStocks.length) await new Promise(r => setTimeout(r, 1100));
+    if (i + BATCH < US_STOCKS.length) await new Promise(r => setTimeout(r, 1100));
   }
 
   renderAll();
