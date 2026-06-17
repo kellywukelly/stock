@@ -434,6 +434,60 @@
   .badge-reuters { background: #e85d04; color: #fff; }
   .badge-yahoo   { background: #6001d2; color: #fff; }
   .badge-ft      { background: #fff; color: #000; }
+  .badge-cnbc    { background: #0057a8; color: #fff; }
+  .badge-fed     { background: #1a3a5c; color: #7eb8e8; border: 1px solid #2a5a8c; }
+
+  .news-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+
+  .news-desc {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 3px 0;
+  }
+
+  .news-breaking {
+    border-color: rgba(239,68,68,0.4) !important;
+    background: rgba(239,68,68,0.04) !important;
+  }
+
+  .news-breaking:hover {
+    border-color: rgba(239,68,68,0.7) !important;
+    background: rgba(239,68,68,0.08) !important;
+  }
+
+  .news-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 8px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .news-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Impact badges upgrade */
+  .impact-urgent   { background: rgba(239,68,68,0.25);  color: #f87171; }
+  .impact-fed      { background: rgba(59,130,246,0.2);  color: #60a5fa; }
+  .impact-geo      { background: rgba(251,146,60,0.2);  color: #fb923c; }
+  .impact-trade    { background: rgba(234,179,8,0.2);   color: #facc15; }
+  .impact-macro    { background: rgba(168,85,247,0.2);  color: #c084fc; }
+  .impact-earnings { background: rgba(34,197,94,0.2);   color: #4ade80; }
 
   .news-content { flex: 1; }
 
@@ -914,72 +968,153 @@ async function loadMacro() {
 }
 
 // ── 財經新聞 RSS (B) ──
+const RSS_FEEDS = [
+  {
+    url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC,^IXIC,NVDA,TSLA,AAPL&region=US&lang=en-US',
+    source: 'Yahoo Finance', badge: 'badge-yahoo', limit: 10
+  },
+  {
+    url: 'https://feeds.reuters.com/reuters/businessNews',
+    source: 'Reuters Business', badge: 'badge-reuters', limit: 10
+  },
+  {
+    url: 'https://feeds.reuters.com/reuters/worldNews',
+    source: 'Reuters World', badge: 'badge-reuters', limit: 8
+  },
+  {
+    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114',
+    source: 'CNBC Markets', badge: 'badge-cnbc', limit: 8
+  },
+  {
+    url: 'https://www.federalreserve.gov/feeds/press_all.xml',
+    source: 'Fed官方', badge: 'badge-fed', limit: 5
+  },
+];
+
+// 重大事件關鍵字分類
+const IMPACT_RULES = [
+  // 🔴 緊急 — 最高優先
+  {
+    score: 10, cls: 'impact-urgent', label: '🔴 緊急',
+    keywords: ['breaking','emergency','attack','missile','nuclear','explosion','assassination','coup','default','collapse','crash','halt trading']
+  },
+  // 🟠 Fed / 貨幣政策
+  {
+    score: 9, cls: 'impact-fed', label: '🏦 Fed',
+    keywords: ['federal reserve','fed rate','interest rate decision','fomc','powell','rate hike','rate cut','basis points','bps','monetary policy','inflation data','cpi report','pce']
+  },
+  // 🔴 地緣政治 / 戰爭
+  {
+    score: 8, cls: 'impact-geo', label: '⚔️ 地緣政治',
+    keywords: ['iran','israel','ukraine','russia','china taiwan','south china sea','north korea','war','ceasefire','airstrike','sanction','embargo','military','troops','nato','conflict']
+  },
+  // 🟠 貿易 / 關稅
+  {
+    score: 7, cls: 'impact-trade', label: '🚢 貿易',
+    keywords: ['tariff','trade war','export ban','import restriction','supply chain','semiconductor ban','chip restriction','huawei','trade deal']
+  },
+  // 🟡 總體經濟
+  {
+    score: 6, cls: 'impact-macro', label: '📊 總經',
+    keywords: ['gdp','recession','unemployment','jobs report','nonfarm','payroll','retail sales','manufacturing','pmi','consumer confidence','housing','debt ceiling','budget']
+  },
+  // 🟡 財報 / 企業
+  {
+    score: 5, cls: 'impact-earnings', label: '💹 財報',
+    keywords: ['earnings','revenue','profit','quarterly result','guidance','outlook','beat','miss','ipo','acquisition','merger','layoff','restructure']
+  },
+  // ⚪ 一般
+  {
+    score: 1, cls: 'impact-low', label: '一般',
+    keywords: []
+  },
+];
+
+function getImpact(title) {
+  const t = title.toLowerCase();
+  for (const rule of IMPACT_RULES) {
+    if (rule.keywords.length === 0) return rule;
+    if (rule.keywords.some(k => t.includes(k))) return rule;
+  }
+  return IMPACT_RULES[IMPACT_RULES.length - 1];
+}
+
 async function loadNews() {
   const newsEl = document.getElementById('news-list');
-  const RSS_FEEDS = [
-    {
-      url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC,^IXIC,NVDA,TSLA&region=US&lang=en-US',
-      source: 'Yahoo Finance', badge: 'badge-yahoo'
-    },
-    {
-      url: 'https://feeds.reuters.com/reuters/businessNews',
-      source: 'Reuters', badge: 'badge-reuters'
-    },
-  ];
-
-  const allItems = [];
   const proxy = 'https://api.allorigins.win/raw?url=';
+  const allItems = [];
 
-  for (const feed of RSS_FEEDS) {
+  await Promise.all(RSS_FEEDS.map(async (feed) => {
     try {
       const r = await fetch(proxy + encodeURIComponent(feed.url));
+      if (!r.ok) return;
       const text = await r.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
-      const items = [...xml.querySelectorAll('item')].slice(0, 8);
+      const items = [...xml.querySelectorAll('item')].slice(0, feed.limit);
       items.forEach(item => {
-        const title = item.querySelector('title')?.textContent || '';
-        const link  = item.querySelector('link')?.textContent || '#';
+        const title   = item.querySelector('title')?.textContent?.trim() || '';
+        const link    = item.querySelector('link')?.textContent?.trim() || '#';
+        const desc    = item.querySelector('description')?.textContent?.replace(/<[^>]+>/g,'').trim().slice(0,120) || '';
         const pubDate = item.querySelector('pubDate')?.textContent || '';
-        const date = pubDate ? new Date(pubDate).toLocaleString('zh-TW', {
-          month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit'
+        const dateObj = pubDate ? new Date(pubDate) : new Date(0);
+        const dateStr = pubDate ? dateObj.toLocaleString('zh-TW', {
+          month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
         }) : '';
-        const impact = getImpact(title);
-        allItems.push({ title, link, date, source: feed.source, badge: feed.badge, impact });
+        if (!title) return;
+        const impact = getImpact(title + ' ' + desc);
+        allItems.push({ title, link, desc, date: dateStr, dateObj, source: feed.source, badge: feed.badge, impact });
       });
-    } catch { continue; }
-  }
+    } catch { /* skip failed feed */ }
+  }));
 
   if (allItems.length === 0) {
     newsEl.innerHTML = `<div class="loading-overlay" style="color:var(--muted)">⚠️ 新聞載入失敗，請稍後再試</div>`;
     return;
   }
 
-  // Sort by impact then date
-  allItems.sort((a, b) => b.impact.score - a.impact.score);
+  // 去重（同標題）
+  const seen = new Set();
+  const unique = allItems.filter(item => {
+    const key = item.title.slice(0, 60);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
-  newsEl.innerHTML = allItems.map(item => `
-    <a class="news-item" href="${item.link}" target="_blank" rel="noopener">
-      <span class="news-source-badge ${item.badge}">${item.source}</span>
+  // 排序：分數高的優先，同分數按時間新舊
+  unique.sort((a, b) => b.impact.score - a.impact.score || b.dateObj - a.dateObj);
+
+  // 重大事件（score >= 8）獨立置頂
+  const breaking = unique.filter(i => i.impact.score >= 8);
+  const normal   = unique.filter(i => i.impact.score < 8);
+
+  let html = '';
+
+  if (breaking.length > 0) {
+    html += `<div class="news-section-label">⚡ 重大事件 · 置頂</div>`;
+    html += breaking.map(item => renderNewsItem(item, true)).join('');
+    html += `<div class="news-section-label" style="margin-top:20px">📰 最新財經新聞</div>`;
+  }
+
+  html += normal.map(item => renderNewsItem(item, false)).join('');
+  newsEl.innerHTML = html;
+}
+
+function renderNewsItem(item, isBreaking) {
+  return `
+    <a class="news-item ${isBreaking ? 'news-breaking' : ''}" href="${item.link}" target="_blank" rel="noopener">
+      <div class="news-left">
+        <span class="news-source-badge ${item.badge}">${item.source}</span>
+        <span class="news-impact ${item.impact.cls}">${item.impact.label}</span>
+      </div>
       <div class="news-content">
-        <div class="news-title">
-          ${item.title}
-          <span class="news-impact ${item.impact.cls}">${item.impact.label}</span>
-        </div>
+        <div class="news-title">${item.title}</div>
+        ${item.desc ? `<div class="news-desc">${item.desc}...</div>` : ''}
         <div class="news-meta">${item.date}</div>
       </div>
     </a>
-  `).join('');
-}
-
-function getImpact(title) {
-  const t = title.toLowerCase();
-  const highKw = ['fed','rate','inflation','cpi','gdp','recession','war','tariff','ban','sanction','crash','collapse','crisis'];
-  const midKw  = ['earnings','revenue','forecast','guidance','cut','hike','ipo','acquisition','merger'];
-  if (highKw.some(k => t.includes(k))) return { label: '高影響', cls: 'impact-high', score: 3 };
-  if (midKw.some(k => t.includes(k)))  return { label: '中影響', cls: 'impact-mid',  score: 2 };
-  return { label: '一般', cls: 'impact-low', score: 1 };
+  `;
 }
 
 // Init
