@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>股市熱力圖 · StockMap</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #0a0d12;
+    --surface: #111520;
+    --border: #1e2535;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --gain5: #00c853;
+    --gain3: #43a047;
+    --gain1: #2e7d32;
+    --flat: #263238;
+    --loss1: #b71c1c;
+    --loss3: #c62828;
+    --loss5: #e53935;
+    --accent: #3b82f6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--gain5);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  #refresh-info {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  #last-updated {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .refresh-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .refresh-btn:hover { border-color: var(--accent); background: rgba(59,130,246,0.08); }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 16px 24px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .tab {
+    padding: 8px 20px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    border: 1px solid transparent;
+    border-bottom: none;
+    transition: color 0.2s, background 0.2s;
+    background: transparent;
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .tab.active {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
+    position: relative;
+    bottom: -1px;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 24px;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .legend-bar {
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    height: 12px;
+  }
+
+  .legend-bar span {
+    width: 36px;
+    display: inline-block;
+  }
+
+  .legend-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  /* ── Main ── */
+  main { flex: 1; padding: 20px 24px; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Heatmap Grid ── */
+  .heatmap-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 28px;
+    min-height: 80px;
+  }
+
+  .stock-tile {
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    min-width: 70px;
+    min-height: 70px;
+  }
+
+  .stock-tile::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.03);
+    pointer-events: none;
+  }
+
+  .stock-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    filter: brightness(1.15);
+    z-index: 10;
+  }
+
+  .tile-symbol {
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: rgba(255,255,255,0.95);
+    letter-spacing: 0.3px;
+  }
+
+  .tile-name {
+    font-size: 9px;
+    color: rgba(255,255,255,0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  .tile-change {
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.95);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .tile-price {
+    font-size: 9px;
+    color: rgba(255,255,255,0.6);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 1px;
+  }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: fixed;
+    background: #1a2035;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.15s;
+    min-width: 200px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+  }
+
+  #tooltip.visible { opacity: 1; }
+
+  .tt-symbol {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+
+  .tt-name { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
+
+  .tt-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .tt-label { color: var(--muted); }
+
+  .tt-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  .tt-val.pos { color: var(--gain5); }
+  .tt-val.neg { color: var(--loss5); }
+
+  /* ── Loading / Error ── */
+  .loading-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px;
+    color: var(--muted);
+    font-size: 13px;
+    width: 100%;
+  }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Stats Bar ── */
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    padding: 12px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .stat-item { display: flex; gap: 6px; align-items: center; }
+  .stat-label { color: var(--muted); }
+  .stat-val { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .stat-val.pos { color: var(--gain5); }
+  .stat-val.neg { color: var(--loss5); }
+
+  /* ── ETF special badge ── */
+  .etf-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 7px;
+    font-weight: 700;
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+    padding: 1px 4px;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    股市熱力圖
+  </div>
+  <div class="header-right">
+    <span id="last-updated">載入中...</span>
+    <span id="refresh-info">60s 自動更新</span>
+    <button class="refresh-btn" onclick="fetchAll()">↻ 手動更新</button>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-item">
+    <span class="stat-label">上漲</span>
+    <span class="stat-val pos" id="stat-up">-</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">下跌</span>
+    <span class="stat-val neg" id="stat-down">-</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">平盤</span>
+    <span class="stat-val" id="stat-flat" style="color:var(--muted)">-</span>
+  </div>
+  <div class="stat-item" style="margin-left:auto">
+    <span class="stat-label">資料來源</span>
+    <span class="stat-val" style="color:var(--accent)">Finnhub</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('all', this)">🌐 全部</button>
+  <button class="tab" onclick="switchTab('tw', this)">🇹🇼 台股</button>
+  <button class="tab" onclick="switchTab('us', this)">🇺🇸 美股</button>
+  <button class="tab" onclick="switchTab('etf', this)">📦 ETF</button>
+</div>
+
+<div class="legend">
+  <span>漲跌幅：</span>
+  <div class="legend-bar">
+    <span style="background:#00c853"></span>
+    <span style="background:#43a047"></span>
+    <span style="background:#2e7d32"></span>
+    <span style="background:#263238"></span>
+    <span style="background:#b71c1c"></span>
+    <span style="background:#c62828"></span>
+    <span style="background:#e53935"></span>
+  </div>
+  <span class="legend-label">+5%</span>
+  <span style="flex:1"></span>
+  <span class="legend-label">0%</span>
+  <span style="flex:1"></span>
+  <span class="legend-label">-5%</span>
+</div>
+
+<main id="main-content">
+  <div id="section-tw">
+    <div class="section-title">台股 · 個股</div>
+    <div class="heatmap-container" id="heatmap-tw"></div>
+  </div>
+  <div id="section-tw-etf">
+    <div class="section-title">台股 · ETF</div>
+    <div class="heatmap-container" id="heatmap-tw-etf"></div>
+  </div>
+  <div id="section-us">
+    <div class="section-title">美股 · 科技 / AI</div>
+    <div class="heatmap-container" id="heatmap-us"></div>
+  </div>
+</main>
+
+<div id="tooltip">
+  <div class="tt-symbol" id="tt-symbol"></div>
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-row"><span class="tt-label">現價</span><span class="tt-val" id="tt-price"></span></div>
+  <div class="tt-row"><span class="tt-label">漲跌</span><span class="tt-val" id="tt-change"></span></div>
+  <div class="tt-row"><span class="tt-label">漲跌幅</span><span class="tt-val" id="tt-pct"></span></div>
+  <div class="tt-row"><span class="tt-label">開盤</span><span class="tt-val" id="tt-open"></span></div>
+  <div class="tt-row"><span class="tt-label">最高</span><span class="tt-val" id="tt-high"></span></div>
+  <div class="tt-row"><span class="tt-label">最低</span><span class="tt-val" id="tt-low"></span></div>
+</div>
+
+<script>
+const API_KEY = 'd8p5eb1r01qp954vb26gd8p5eb1r01qp954vb270';
+
+const TW_STOCKS = [
+  { symbol: '2330.TW', name: '台積電', size: 9 },
+  { symbol: '2317.TW', name: '鴻海', size: 6 },
+  { symbol: '2454.TW', name: '聯發科', size: 6 },
+  { symbol: '3008.TW', name: '大立光', size: 4 },
+  { symbol: '2382.TW', name: '廣達', size: 5 },
+  { symbol: '2357.TW', name: '華碩', size: 4 },
+  { symbol: '2412.TW', name: '中華電', size: 4 },
+  { symbol: '2308.TW', name: '台達電', size: 5 },
+  { symbol: '2303.TW', name: '聯電', size: 4 },
+  { symbol: '2891.TW', name: '中信金', size: 4 },
+  { symbol: '2881.TW', name: '富邦金', size: 4 },
+  { symbol: '2882.TW', name: '國泰金', size: 4 },
+  { symbol: '3711.TW', name: '日月光投控', size: 4 },
+  { symbol: '2886.TW', name: '兆豐金', size: 3 },
+  { symbol: '2395.TW', name: '研華', size: 3 },
+  { symbol: '6505.TW', name: '台塑化', size: 3 },
+  { symbol: '1301.TW', name: '台塑', size: 3 },
+  { symbol: '2002.TW', name: '中鋼', size: 3 },
+  { symbol: '2376.TW', name: '技嘉', size: 3 },
+  { symbol: '2379.TW', name: '瑞昱', size: 3 },
+];
+
+const TW_ETFS = [
+  { symbol: '0050.TW', name: '元大台灣50', size: 5, etf: true },
+  { symbol: '0056.TW', name: '元大高股息', size: 4, etf: true },
+  { symbol: '00878.TW', name: '國泰永續高股息', size: 5, etf: true },
+  { symbol: '00919.TW', name: '群益台灣精選高息', size: 4, etf: true },
+  { symbol: '006208.TW', name: '富邦台50', size: 4, etf: true },
+  { symbol: '00929.TW', name: '復華台灣科技優息', size: 3, etf: true },
+  { symbol: '00940.TW', name: '元大台灣價值高息', size: 3, etf: true },
+];
+
+const US_STOCKS = [
+  { symbol: 'NVDA', name: 'NVIDIA', size: 9 },
+  { symbol: 'MSFT', name: 'Microsoft', size: 8 },
+  { symbol: 'AAPL', name: 'Apple', size: 8 },
+  { symbol: 'GOOGL', name: 'Alphabet', size: 7 },
+  { symbol: 'META', name: 'Meta', size: 7 },
+  { symbol: 'AMZN', name: 'Amazon', size: 7 },
+  { symbol: 'TSLA', name: 'Tesla', size: 6 },
+  { symbol: 'AMD', name: 'AMD', size: 5 },
+  { symbol: 'AVGO', name: 'Broadcom', size: 5 },
+  { symbol: 'INTC', name: 'Intel', size: 4 },
+  { symbol: 'QCOM', name: 'Qualcomm', size: 4 },
+  { symbol: 'ORCL', name: 'Oracle', size: 5 },
+  { symbol: 'CRM', name: 'Salesforce', size: 4 },
+  { symbol: 'PLTR', name: 'Palantir', size: 4 },
+  { symbol: 'ARM', name: 'ARM Holdings', size: 4 },
+  { symbol: 'SMCI', name: 'Super Micro', size: 3 },
+  { symbol: 'TSM', name: 'TSMC ADR', size: 6 },
+  { symbol: 'NFLX', name: 'Netflix', size: 5 },
+  { symbol: 'UBER', name: 'Uber', size: 4 },
+  { symbol: 'ASML', name: 'ASML', size: 4 },
+];
+
+let stockData = {};
+let currentTab = 'all';
+let refreshTimer = null;
+let countdown = 60;
+
+function getColor(pct) {
+  if (pct === null || pct === undefined) return '#1e2535';
+  if (pct >= 5)  return '#00c853';
+  if (pct >= 3)  return '#43a047';
+  if (pct >= 1)  return '#2e7d32';
+  if (pct >= -1) return '#263238';
+  if (pct >= -3) return '#b71c1c';
+  if (pct >= -5) return '#c62828';
+  return '#e53935';
+}
+
+function getTileSize(size) {
+  const base = 60;
+  return base + size * 12;
+}
+
+function fmt(n, dec = 2) {
+  if (n === null || n === undefined || isNaN(n)) return '-';
+  return n.toFixed(dec);
+}
+
+function fmtPrice(n, isTW) {
+  if (n === null || isNaN(n)) return '-';
+  return isTW ? `NT$${n.toFixed(2)}` : `$${n.toFixed(2)}`;
+}
+
+async function fetchQuote(symbol) {
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${API_KEY}`);
+    const d = await r.json();
+    if (d && d.c && d.c !== 0) return d;
+    return null;
+  } catch { return null; }
+}
+
+async function fetchAll() {
+  const allStocks = [...TW_STOCKS, ...TW_ETFS, ...US_STOCKS];
+
+  // Show loading
+  ['heatmap-tw','heatmap-tw-etf','heatmap-us'].forEach(id => {
+    document.getElementById(id).innerHTML = `<div class="loading-overlay"><div class="spinner"></div>抓取資料中...</div>`;
+  });
+
+  // Fetch in batches to respect rate limit
+  const BATCH = 10;
+  for (let i = 0; i < allStocks.length; i += BATCH) {
+    const batch = allStocks.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (s) => {
+      const q = await fetchQuote(s.symbol);
+      if (q) stockData[s.symbol] = q;
+    }));
+    if (i + BATCH < allStocks.length) await new Promise(r => setTimeout(r, 1100));
+  }
+
+  renderAll();
+  updateStats();
+  updateTimestamp();
+  startCountdown();
+}
+
+function renderTile(stock, isTW) {
+  const q = stockData[stock.symbol];
+  const pct = q ? ((q.c - q.pc) / q.pc * 100) : null;
+  const change = q ? (q.c - q.pc) : null;
+  const size = getTileSize(stock.size);
+  const color = getColor(pct);
+  const pctStr = pct !== null ? `${pct >= 0 ? '+' : ''}${fmt(pct)}%` : '---';
+  const priceStr = q ? fmtPrice(q.c, isTW) : '-';
+  const shortSymbol = stock.symbol.replace('.TW','');
+
+  return `
+    <div class="stock-tile"
+      style="background:${color}; width:${size}px; height:${size}px; flex:0 0 ${size}px"
+      onmouseenter="showTooltip(event, '${stock.symbol}', '${stock.name}', ${isTW})"
+      onmouseleave="hideTooltip()"
+      onmousemove="moveTooltip(event)"
+    >
+      ${stock.etf ? '<div class="etf-badge">ETF</div>' : ''}
+      <div>
+        <div class="tile-symbol">${shortSymbol}</div>
+        <div class="tile-name">${stock.name}</div>
+      </div>
+      <div>
+        <div class="tile-change">${pctStr}</div>
+        <div class="tile-price">${priceStr}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAll() {
+  document.getElementById('heatmap-tw').innerHTML =
+    TW_STOCKS.map(s => renderTile(s, true)).join('');
+  document.getElementById('heatmap-tw-etf').innerHTML =
+    TW_ETFS.map(s => renderTile(s, true)).join('');
+  document.getElementById('heatmap-us').innerHTML =
+    US_STOCKS.map(s => renderTile(s, false)).join('');
+}
+
+function updateStats() {
+  const all = [...TW_STOCKS, ...TW_ETFS, ...US_STOCKS];
+  let up = 0, down = 0, flat = 0;
+  all.forEach(s => {
+    const q = stockData[s.symbol];
+    if (!q) return;
+    const pct = (q.c - q.pc) / q.pc * 100;
+    if (pct > 0.1) up++;
+    else if (pct < -0.1) down++;
+    else flat++;
+  });
+  document.getElementById('stat-up').textContent = up;
+  document.getElementById('stat-down').textContent = down;
+  document.getElementById('stat-flat').textContent = flat;
+}
+
+function updateTimestamp() {
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    `更新於 ${now.toLocaleTimeString('zh-TW')}`;
+}
+
+function startCountdown() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  countdown = 60;
+  refreshTimer = setInterval(() => {
+    countdown--;
+    document.getElementById('refresh-info').textContent = `${countdown}s 後更新`;
+    if (countdown <= 0) {
+      clearInterval(refreshTimer);
+      fetchAll();
+    }
+  }, 1000);
+}
+
+// Tooltip
+const tooltip = document.getElementById('tooltip');
+
+function showTooltip(e, symbol, name, isTW) {
+  const q = stockData[symbol];
+  document.getElementById('tt-symbol').textContent = symbol.replace('.TW','');
+  document.getElementById('tt-name').textContent = name;
+  if (q) {
+    const pct = (q.c - q.pc) / q.pc * 100;
+    const change = q.c - q.pc;
+    const isPos = pct >= 0;
+    document.getElementById('tt-price').textContent = fmtPrice(q.c, isTW);
+    document.getElementById('tt-price').className = 'tt-val';
+    const chEl = document.getElementById('tt-change');
+    chEl.textContent = `${change >= 0 ? '+' : ''}${fmt(change)}`;
+    chEl.className = `tt-val ${isPos ? 'pos' : 'neg'}`;
+    const pctEl = document.getElementById('tt-pct');
+    pctEl.textContent = `${pct >= 0 ? '+' : ''}${fmt(pct)}%`;
+    pctEl.className = `tt-val ${isPos ? 'pos' : 'neg'}`;
+    document.getElementById('tt-open').textContent = fmtPrice(q.o, isTW);
+    document.getElementById('tt-high').textContent = fmtPrice(q.h, isTW);
+    document.getElementById('tt-low').textContent = fmtPrice(q.l, isTW);
+  } else {
+    ['tt-price','tt-change','tt-pct','tt-open','tt-high','tt-low']
+      .forEach(id => { document.getElementById(id).textContent = '-'; });
+  }
+  tooltip.classList.add('visible');
+  moveTooltip(e);
+}
+
+function hideTooltip() { tooltip.classList.remove('visible'); }
+
+function moveTooltip(e) {
+  const x = e.clientX + 16;
+  const y = e.clientY - 10;
+  const tw = tooltip.offsetWidth || 200;
+  const th = tooltip.offsetHeight || 180;
+  tooltip.style.left = (x + tw > window.innerWidth ? x - tw - 32 : x) + 'px';
+  tooltip.style.top = (y + th > window.innerHeight ? y - th : y) + 'px';
+}
+
+// Tab switching
+function switchTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+
+  const showTw    = tab === 'all' || tab === 'tw' || tab === 'etf' || tab === 'tw';
+  const showTwEtf = tab === 'all' || tab === 'etf' || tab === 'tw';
+  const showUs    = tab === 'all' || tab === 'us';
+  const showOnlyEtf = tab === 'etf';
+
+  document.getElementById('section-tw').style.display =
+    (tab === 'all' || tab === 'tw') ? '' : 'none';
+  document.getElementById('section-tw-etf').style.display =
+    (tab === 'all' || tab === 'tw' || tab === 'etf') ? '' : 'none';
+  document.getElementById('section-us').style.display =
+    (tab === 'all' || tab === 'us') ? '' : 'none';
+}
+
+// Init
+fetchAll();
+</script>
+</body>
+</html>
