@@ -436,6 +436,8 @@
   .badge-ft      { background: #fff; color: #000; }
   .badge-cnbc    { background: #0057a8; color: #fff; }
   .badge-fed     { background: #1a3a5c; color: #7eb8e8; border: 1px solid #2a5a8c; }
+  .badge-mw      { background: #000; color: #fff; }
+  .badge-investing { background: #e84040; color: #fff; }
 
   .news-left {
     display: flex;
@@ -971,67 +973,80 @@ async function loadMacro() {
 const RSS_FEEDS = [
   {
     url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC,^IXIC,NVDA,TSLA,AAPL&region=US&lang=en-US',
-    source: 'Yahoo Finance', badge: 'badge-yahoo', limit: 10
+    source: 'Yahoo Finance', badge: 'badge-yahoo', limit: 12
   },
   {
-    url: 'https://feeds.reuters.com/reuters/businessNews',
-    source: 'Reuters Business', badge: 'badge-reuters', limit: 10
+    url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines',
+    source: 'MarketWatch', badge: 'badge-mw', limit: 10
   },
   {
-    url: 'https://feeds.reuters.com/reuters/worldNews',
-    source: 'Reuters World', badge: 'badge-reuters', limit: 8
+    url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',
+    source: 'MarketWatch', badge: 'badge-mw', limit: 8
   },
   {
-    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114',
-    source: 'CNBC Markets', badge: 'badge-cnbc', limit: 8
+    url: 'https://www.investing.com/rss/news.rss',
+    source: 'Investing.com', badge: 'badge-investing', limit: 8
   },
   {
     url: 'https://www.federalreserve.gov/feeds/press_all.xml',
-    source: 'Fed官方', badge: 'badge-fed', limit: 5
+    source: 'Fed 官方', badge: 'badge-fed', limit: 5
   },
 ];
 
+// 多個 CORS proxy，依序嘗試
+const PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+async function fetchRSS(feedUrl) {
+  for (const buildProxy of PROXIES) {
+    try {
+      const r = await fetch(buildProxy(feedUrl), { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) continue;
+      const text = await r.text();
+      if (!text || text.length < 100) continue;
+      return text;
+    } catch { continue; }
+  }
+  return null;
+}
+
 // 重大事件關鍵字分類
 const IMPACT_RULES = [
-  // 🔴 緊急 — 最高優先
   {
     score: 10, cls: 'impact-urgent', label: '🔴 緊急',
-    keywords: ['breaking','emergency','attack','missile','nuclear','explosion','assassination','coup','default','collapse','crash','halt trading']
+    keywords: ['breaking','emergency','attack','missile','nuclear','explosion','assassination','coup','default','collapse','crash','halt trading','war breaks']
   },
-  // 🟠 Fed / 貨幣政策
   {
     score: 9, cls: 'impact-fed', label: '🏦 Fed',
-    keywords: ['federal reserve','fed rate','interest rate decision','fomc','powell','rate hike','rate cut','basis points','bps','monetary policy','inflation data','cpi report','pce']
+    keywords: ['federal reserve','fed rate','interest rate decision','fomc','powell','rate hike','rate cut','basis points','monetary policy','cpi','pce','inflation','jackson hole']
   },
-  // 🔴 地緣政治 / 戰爭
   {
     score: 8, cls: 'impact-geo', label: '⚔️ 地緣政治',
-    keywords: ['iran','israel','ukraine','russia','china taiwan','south china sea','north korea','war','ceasefire','airstrike','sanction','embargo','military','troops','nato','conflict']
+    keywords: ['iran','israel','ukraine','russia','china taiwan','south china sea','north korea','war','ceasefire','airstrike','sanction','embargo','military strike','troops','nato','conflict','middle east','gulf']
   },
-  // 🟠 貿易 / 關稅
   {
     score: 7, cls: 'impact-trade', label: '🚢 貿易',
-    keywords: ['tariff','trade war','export ban','import restriction','supply chain','semiconductor ban','chip restriction','huawei','trade deal']
+    keywords: ['tariff','trade war','export ban','import restriction','supply chain','semiconductor ban','chip restriction','huawei','trade deal','wto','customs']
   },
-  // 🟡 總體經濟
   {
     score: 6, cls: 'impact-macro', label: '📊 總經',
-    keywords: ['gdp','recession','unemployment','jobs report','nonfarm','payroll','retail sales','manufacturing','pmi','consumer confidence','housing','debt ceiling','budget']
+    keywords: ['gdp','recession','unemployment','jobs report','nonfarm','payroll','retail sales','pmi','consumer confidence','housing','debt ceiling','budget','fiscal','treasury']
   },
-  // 🟡 財報 / 企業
   {
     score: 5, cls: 'impact-earnings', label: '💹 財報',
-    keywords: ['earnings','revenue','profit','quarterly result','guidance','outlook','beat','miss','ipo','acquisition','merger','layoff','restructure']
+    keywords: ['earnings','revenue','profit','quarterly','guidance','outlook','beat','miss','ipo','acquisition','merger','layoff','buyback']
   },
-  // ⚪ 一般
   {
     score: 1, cls: 'impact-low', label: '一般',
     keywords: []
   },
 ];
 
-function getImpact(title) {
-  const t = title.toLowerCase();
+function getImpact(text) {
+  const t = text.toLowerCase();
   for (const rule of IMPACT_RULES) {
     if (rule.keywords.length === 0) return rule;
     if (rule.keywords.some(k => t.includes(k))) return rule;
@@ -1041,60 +1056,67 @@ function getImpact(title) {
 
 async function loadNews() {
   const newsEl = document.getElementById('news-list');
-  const proxy = 'https://api.allorigins.win/raw?url=';
+  newsEl.innerHTML = `<div class="loading-overlay"><div class="spinner"></div>載入新聞中...</div>`;
+
   const allItems = [];
 
   await Promise.all(RSS_FEEDS.map(async (feed) => {
+    const text = await fetchRSS(feed.url);
+    if (!text) return;
     try {
-      const r = await fetch(proxy + encodeURIComponent(feed.url));
-      if (!r.ok) return;
-      const text = await r.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
       const items = [...xml.querySelectorAll('item')].slice(0, feed.limit);
       items.forEach(item => {
         const title   = item.querySelector('title')?.textContent?.trim() || '';
         const link    = item.querySelector('link')?.textContent?.trim() || '#';
-        const desc    = item.querySelector('description')?.textContent?.replace(/<[^>]+>/g,'').trim().slice(0,120) || '';
+        const desc    = (item.querySelector('description')?.textContent || '')
+                          .replace(/<[^>]+>/g, '').replace(/&nbsp;/g,' ').trim().slice(0, 130);
         const pubDate = item.querySelector('pubDate')?.textContent || '';
         const dateObj = pubDate ? new Date(pubDate) : new Date(0);
         const dateStr = pubDate ? dateObj.toLocaleString('zh-TW', {
           month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
         }) : '';
-        if (!title) return;
+        if (!title || title.length < 5) return;
         const impact = getImpact(title + ' ' + desc);
         allItems.push({ title, link, desc, date: dateStr, dateObj, source: feed.source, badge: feed.badge, impact });
       });
-    } catch { /* skip failed feed */ }
+    } catch { /* parse error, skip */ }
   }));
 
   if (allItems.length === 0) {
-    newsEl.innerHTML = `<div class="loading-overlay" style="color:var(--muted)">⚠️ 新聞載入失敗，請稍後再試</div>`;
+    newsEl.innerHTML = `
+      <div style="padding:32px;text-align:center;color:var(--muted)">
+        <div style="font-size:32px;margin-bottom:12px">📡</div>
+        <div style="font-size:14px;margin-bottom:6px">新聞載入失敗</div>
+        <div style="font-size:12px">可能是網路或 proxy 問題，請稍後再試</div>
+        <button onclick="macroLoaded=false;loadMacro()" style="margin-top:16px;padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">重新載入</button>
+      </div>`;
     return;
   }
 
-  // 去重（同標題）
+  // 去重
   const seen = new Set();
   const unique = allItems.filter(item => {
-    const key = item.title.slice(0, 60);
+    const key = item.title.slice(0, 50).toLowerCase();
     if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+    seen.add(key); return true;
   });
 
-  // 排序：分數高的優先，同分數按時間新舊
+  // 排序：影響分數高 → 時間新
   unique.sort((a, b) => b.impact.score - a.impact.score || b.dateObj - a.dateObj);
 
-  // 重大事件（score >= 8）獨立置頂
   const breaking = unique.filter(i => i.impact.score >= 8);
   const normal   = unique.filter(i => i.impact.score < 8);
 
-  let html = '';
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:12px">共 ${unique.length} 則新聞 · 來自 ${RSS_FEEDS.length} 個來源</div>`;
 
   if (breaking.length > 0) {
     html += `<div class="news-section-label">⚡ 重大事件 · 置頂</div>`;
     html += breaking.map(item => renderNewsItem(item, true)).join('');
     html += `<div class="news-section-label" style="margin-top:20px">📰 最新財經新聞</div>`;
+  } else {
+    html += `<div class="news-section-label">📰 最新財經新聞</div>`;
   }
 
   html += normal.map(item => renderNewsItem(item, false)).join('');
@@ -1110,7 +1132,7 @@ function renderNewsItem(item, isBreaking) {
       </div>
       <div class="news-content">
         <div class="news-title">${item.title}</div>
-        ${item.desc ? `<div class="news-desc">${item.desc}...</div>` : ''}
+        ${item.desc ? `<div class="news-desc">${item.desc}…</div>` : ''}
         <div class="news-meta">${item.date}</div>
       </div>
     </a>
