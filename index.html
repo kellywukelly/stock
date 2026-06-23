@@ -58,7 +58,7 @@ main{flex:1;padding:20px 24px;}
   border-radius:8px;padding:8px 10px;cursor:pointer;
   transition:transform .15s,box-shadow .15s,filter .15s;
   display:flex;flex-direction:column;justify-content:space-between;
-  position:relative;overflow:hidden;min-width:80px;min-height:90px;
+  position:relative;overflow:hidden;min-width:90px;min-height:105px;
 }
 .stock-tile::before{content:'';position:absolute;inset:0;background:rgba(255,255,255,.03);pointer-events:none;}
 .stock-tile:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,.5);filter:brightness(1.12);z-index:10;}
@@ -66,16 +66,16 @@ main{flex:1;padding:20px 24px;}
 .tile-top{display:flex;align-items:center;gap:5px;margin-bottom:2px;}
 .tile-logo{width:16px;height:16px;border-radius:3px;object-fit:contain;background:rgba(255,255,255,.1);flex-shrink:0;}
 .tile-logo-placeholder{width:16px;height:16px;border-radius:3px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:rgba(255,255,255,.7);flex-shrink:0;}
-.tile-symbol{font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.95);letter-spacing:.3px;}
-.tile-name{font-size:8px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
+.tile-symbol{font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.95);letter-spacing:.3px;}
+.tile-name{font-size:10px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
 
 /* sparkline */
-.tile-spark{width:100%;height:22px;margin:2px 0;}
+.tile-spark{width:100%;height:24px;margin:2px 0;}
 .tile-spark svg{width:100%;height:100%;}
 
 .tile-bottom{}
-.tile-change{font-size:13px;font-weight:700;color:rgba(255,255,255,.95);font-family:'JetBrains Mono',monospace;}
-.tile-price{font-size:9px;color:rgba(255,255,255,.55);font-family:'JetBrains Mono',monospace;}
+.tile-change{font-size:16px;font-weight:700;color:rgba(255,255,255,.95);font-family:'JetBrains Mono',monospace;}
+.tile-price{font-size:11px;color:rgba(255,255,255,.55);font-family:'JetBrains Mono',monospace;}
 .etf-badge{position:absolute;top:5px;right:5px;font-size:7px;font-weight:700;background:rgba(255,255,255,.15);border-radius:3px;padding:1px 4px;letter-spacing:.5px;}
 
 /* ── Tooltip ── */
@@ -571,7 +571,7 @@ function getColor(pct) {
   if (pct >= -5) return '#c62828';
   return '#e53935';
 }
-function getTileSize(size){ return 62 + size * 13; }
+function getTileSize(size){ return 72 + size * 14; }
 function fmt(n,d=2){ if(n==null||isNaN(n))return'-'; return n.toFixed(d); }
 function fmtPrice(n,isTW){ if(n==null||isNaN(n))return'-'; return isTW?`NT$${n.toFixed(2)}`:`$${n.toFixed(2)}`; }
 
@@ -738,7 +738,7 @@ function renderTile(stock, isTW) {
   const spark = sparkData[stock.symbol] ? makeSpark(sparkData[stock.symbol], pct>=0) : '';
 
   return `<div class="stock-tile" 
-    style="background:${color};width:${size}px;height:${size+20}px;flex:0 0 ${size}px"
+    style="background:${color};width:${size}px;height:${size+28}px;flex:0 0 ${size}px"
     onclick="openPanel('${stock.symbol}','${stock.name}',${isTW})"
     onmouseenter="showTT(event,'${stock.symbol}','${stock.name}',${isTW})"
     onmouseleave="hideTT()" onmousemove="moveTT(event)">
